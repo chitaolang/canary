@@ -1,4 +1,4 @@
-build/*
-traces/*
-.trace
-.coverage*
+move/build/*
+move/traces/*
+move/.trace
+move/.coverage*
