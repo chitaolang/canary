@@ -79,19 +79,62 @@ if command -v sui >/dev/null 2>&1; then
     if [ ! -f "$ACCOUNT_JSON" ]; then
         echo "Creating new Sui address (ed25519, alias: canery)..."
         
+        # Use temporary file to capture all output
+        TEMP_OUTPUT=$(mktemp)
+        
         # Use here document (EOF) to provide answers to interactive questions:
         # 1. Config file doesn't exist, connect to Sui Full node server? → y
         # 2. Sui Full node server URL → <enter> (use default)
         # 3. Select key scheme (0 for ed25519, 1 for secp256k1, 2 for secp256r1) → 0
-        if sui client new-address ed25519 canery --json > "$ACCOUNT_JSON" 2>&1 <<EOF
+        if sui client new-address ed25519 canery --json > "$TEMP_OUTPUT" 2>&1 <<EOF
 y
 
 0
 EOF
         then
-            echo "✓ New address created and saved to $ACCOUNT_JSON"
-            echo "Address info:"
-            cat "$ACCOUNT_JSON" | head -20
+            # Extract only the JSON output (from first { to last })
+            # Method 1: Try using jq if available (most reliable)
+            if command -v jq >/dev/null 2>&1; then
+                jq -r '.' "$TEMP_OUTPUT" 2>/dev/null > "$ACCOUNT_JSON" || {
+                    # If jq fails, try to extract JSON manually
+                    awk '/^{/,/^}/' "$TEMP_OUTPUT" > "$ACCOUNT_JSON" 2>/dev/null || true
+                }
+            else
+                # Method 2: Use awk to extract JSON object (from { to })
+                awk '
+                    BEGIN { in_json = 0; brace_count = 0; json = "" }
+                    /^{/ { 
+                        in_json = 1
+                        json = $0
+                        brace_count = gsub(/{/, "&", $0) - gsub(/}/, "&", $0)
+                        next
+                    }
+                    in_json {
+                        json = json "\n" $0
+                        brace_count += gsub(/{/, "&", $0)
+                        brace_count -= gsub(/}/, "&", $0)
+                        if (brace_count == 0) {
+                            print json
+                            exit
+                        }
+                    }
+                ' "$TEMP_OUTPUT" > "$ACCOUNT_JSON" 2>/dev/null
+            fi
+            
+            # Verify JSON is valid and not empty
+            if [ -s "$ACCOUNT_JSON" ] && grep -q "^{" "$ACCOUNT_JSON" && grep -q "}" "$ACCOUNT_JSON"; then
+                echo "✓ New address created and saved to $ACCOUNT_JSON"
+                echo "Address info:"
+                cat "$ACCOUNT_JSON"
+            else
+                echo "Warning: Failed to extract JSON from output, but address may have been created"
+                # Check if address already exists
+                if sui client addresses 2>/dev/null | grep -q "canery"; then
+                    echo "Note: Address 'canery' exists, trying to get address info..."
+                    # Try to get address info in JSON format
+                    sui client addresses --json 2>/dev/null | grep -A 10 "canery" | awk '/^{/,/^}/' > "$ACCOUNT_JSON" 2>/dev/null || true
+                fi
+            fi
         else
             echo "Warning: Failed to create new address, but continuing..."
             # Check if address already exists
@@ -99,6 +142,9 @@ EOF
                 echo "Note: Address 'canery' may already exist"
             fi
         fi
+        
+        # Clean up temporary file
+        rm -f "$TEMP_OUTPUT"
     else
         echo "✓ Account file already exists at $ACCOUNT_JSON"
     fi
