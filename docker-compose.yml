@@ -14,6 +14,8 @@ services:
       - ./backend/move-decompiler:/app/move-decompiler:ro
       # map working directory (for temporary files)
       - ./backend/workspace:/app/workspace
+      # map account.json to host (persist Sui address)
+      - ./backend/account.json:/app/account.json
     environment:
       - RUST_LOG=${RUST_LOG:-info}
     # if needed to run periodically, use cron or application internal timer

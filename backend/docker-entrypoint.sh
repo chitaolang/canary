@@ -76,7 +76,33 @@ command -v mvr >/dev/null 2>&1 && echo "✓ mvr found" || echo "✗ mvr not foun
 if command -v sui >/dev/null 2>&1; then
     # Create new address and save to account.json
     ACCOUNT_JSON="/app/account.json"
-    if [ ! -f "$ACCOUNT_JSON" ]; then
+    
+    # Fix: If account.json is a directory (Docker volume issue), remove it
+    if [ -d "$ACCOUNT_JSON" ]; then
+        echo "Warning: $ACCOUNT_JSON is a directory, removing it..."
+        rm -rf "$ACCOUNT_JSON"
+    fi
+    
+    # Check if file exists and is not empty, and contains valid JSON
+    NEED_CREATE=true
+    if [ -f "$ACCOUNT_JSON" ] && [ -s "$ACCOUNT_JSON" ]; then
+        # Check if file contains valid JSON (starts with { and ends with })
+        if grep -q "^{" "$ACCOUNT_JSON" && grep -q "}" "$ACCOUNT_JSON"; then
+            # Try to validate JSON if jq is available
+            if command -v jq >/dev/null 2>&1; then
+                if jq empty "$ACCOUNT_JSON" 2>/dev/null; then
+                    NEED_CREATE=false
+                    echo "✓ Valid account.json found at $ACCOUNT_JSON"
+                fi
+            else
+                # If jq not available, assume valid if it has { and }
+                NEED_CREATE=false
+                echo "✓ Account file exists at $ACCOUNT_JSON (validation skipped, jq not available)"
+            fi
+        fi
+    fi
+    
+    if [ "$NEED_CREATE" = true ]; then
         echo "Creating new Sui address (ed25519, alias: canery)..."
         
         # Use temporary file to capture all output
@@ -145,8 +171,6 @@ EOF
         
         # Clean up temporary file
         rm -f "$TEMP_OUTPUT"
-    else
-        echo "✓ Account file already exists at $ACCOUNT_JSON"
     fi
 fi
 

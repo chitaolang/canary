@@ -6,3 +6,6 @@ move/.coverage*
 # Environment files
 .env
 !.env.example
+
+# Account files (may contain sensitive information)
+backend/account.json
