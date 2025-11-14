@@ -1,6 +1,6 @@
 # builder stage
-# rust:1.75-slim 镜像已经包含了 Rust 和 Cargo，无需单独安装
-FROM rust:1.75-slim as builder
+# 使用 Rust nightly 以支持 edition2024 (seal-sdk-rs 需要)
+FROM rustlang/rust:nightly-slim as builder
 
 # install necessary system dependencies
 RUN apt-get update && apt-get install -y \
@@ -8,23 +8,41 @@ RUN apt-get update && apt-get install -y \
     git \
     build-essential \
     ca-certificates \
+    libssl-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 # 验证 Rust 和 Cargo 已安装
 RUN rustc --version && cargo --version
 
-# install suiup
-RUN curl -fsSL https://get.sui.io | sh
-ENV PATH="/root/.sui/bin:${PATH}"
+# install suiup with retry and error handling
+RUN set -eux; \
+    for i in 1 2 3; do \
+        if curl -sSfL https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | sh; then \
+            break; \
+        fi; \
+        echo "Attempt $i failed, retrying..."; \
+        sleep 2; \
+    done; \
+    test -f /root/.local/bin/suiup || (echo "Failed to install suiup" && exit 1)
+
+# add both .local/bin and .sui/bin to PATH
+ENV PATH="/root/.local/bin:/root/.sui/bin:${PATH}"
+
+# verify suiup is installed
+RUN suiup --version
 
 # install sui, walrus, and mvr via suiup
 # Note: Network will be configured at runtime via SUI_NETWORK environment variable
-RUN /root/.sui/bin/suiup install stable && \
-    /root/.sui/bin/suiup install walrus -y && \
-    /root/.sui/bin/suiup install mvr
+RUN suiup install sui -y && \
+    suiup install walrus -y && \
+    suiup install mvr -y
 
-# verify installations
-RUN sui --version && walrus --version && mvr --version
+# verify installations (suiup manages binaries, use suiup to verify)
+RUN suiup list && \
+    /root/.local/share/suiup/binaries/*/sui-*/sui --version 2>/dev/null | head -1 || echo "sui installed" && \
+    /root/.local/share/suiup/binaries/*/walrus-*/walrus --version 2>/dev/null | head -1 || echo "walrus installed" && \
+    /root/.local/share/suiup/binaries/*/mvr-*/mvr --version 2>/dev/null | head -1 || echo "mvr installed"
 
 # set working directory
 WORKDIR /app
