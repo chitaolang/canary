@@ -6,11 +6,11 @@ use sui::clock::{Self, Clock};
 use sui::derived_object;
 
 // Error codes
-const ENotMember: u64 = 0;
+// const ENotMember: u64 = 0;
 const EDerivedObjectAlreadyExists: u64 = 1;
-const ENotAuthorized: u64 = 2;
-const ECanaryNotFound: u64 = 3;
-const EDomainNotFound: u64 = 4;
+// const ENotAuthorized: u64 = 2;
+// const ECanaryNotFound: u64 = 3;
+// const EDomainNotFound: u64 = 4;
 
 // === Derived Object struct ===
 public struct CanaryBlob has key {

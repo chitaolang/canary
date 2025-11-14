@@ -108,7 +108,7 @@ public entry fun withdraw(
     amount: u64,
     ctx: &mut TxContext,
 ) {
-    verify_admin(admin_cap, registry);
+    assert!(admin_cap.registry_id == object::id(registry), ENotAdmin);
 
     let withdrawn = balance::split(&mut registry.balance, amount);
     let coin = coin::from_balance(withdrawn, ctx);
@@ -117,30 +117,24 @@ public entry fun withdraw(
 
 // Update fee (admin only)
 public entry fun update_fee(registry: &mut Registry, admin_cap: &AdminCap, new_fee: u64) {
-    verify_admin(admin_cap, registry);
+    assert!(admin_cap.registry_id == object::id(registry), ENotAdmin);
     registry.fee = new_fee;
 }
 
 // Remove member (admin only)
 public entry fun remove_member(registry: &mut Registry, admin_cap: &AdminCap, member: address) {
-    verify_admin(admin_cap, registry);
+    assert!(admin_cap.registry_id == object::id(registry), ENotAdmin);
     assert!(table::contains(&registry.members, member), ENotMember);
     table::remove(&mut registry.members, member);
-}
-
-// Verify membership
-public fun verify_membership(cap: &MembershipCap, registry: &Registry): address {
-    assert!(cap.registry_id == object::id(registry), EInvalidCap);
-    cap.member
-}
-
-entry fun seal_approve(cap: &MembershipCap, registry: &Registry, ctx: &TxContext) {
-    assert!(cap.registry_id == object::id(registry), EInvalidCap);
 }
 
 // Verify admin
 public fun verify_admin(admin_cap: &AdminCap, registry: &Registry) {
     assert!(admin_cap.registry_id == object::id(registry), ENotAdmin);
+}
+
+entry fun seal_approve(cap: &MembershipCap, registry: &Registry) {
+    assert!(cap.registry_id == object::id(registry), EInvalidCap);
 }
 
 // Check if member
