@@ -18,11 +18,11 @@ RUN rustc --version && cargo --version
 # install suiup with retry and error handling
 RUN set -eux; \
     for i in 1 2 3; do \
-        if curl -sSfL https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | sh; then \
-            break; \
-        fi; \
-        echo "Attempt $i failed, retrying..."; \
-        sleep 2; \
+    if curl -sSfL https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | sh; then \
+    break; \
+    fi; \
+    echo "Attempt $i failed, retrying..."; \
+    sleep 2; \
     done; \
     test -f /root/.local/bin/suiup || (echo "Failed to install suiup" && exit 1)
 
@@ -34,7 +34,8 @@ RUN suiup --version
 
 # install sui, walrus, and mvr via suiup
 # Note: Network will be configured at runtime via SUI_NETWORK environment variable
-RUN suiup install sui -y && \
+RUN suiup install sui@testnet -y && \
+    suiup install sui@mainnet -y && \
     suiup install walrus -y && \
     suiup install mvr -y
 
@@ -57,13 +58,32 @@ COPY backend/ .
 RUN cargo build --release
 
 # runtime image
-FROM debian:bookworm-slim
+# Use Ubuntu 24.04 which has GLIBC 2.39 (required by sui binaries)
+FROM ubuntu:24.04
 
 # install runtime dependencies
+# Set DEBIAN_FRONTEND to avoid interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
+    findutils \
     && rm -rf /var/lib/apt/lists/*
+
+# install suiup in runtime stage
+RUN curl -sSfL https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | sh
+
+# copy suiup and installed binaries from builder stage
+# Copy the entire .local directory to preserve all binaries and symlinks
+COPY --from=builder /root/.local/bin /root/.local/bin
+COPY --from=builder /root/.local/share/suiup /root/.local/share/suiup
+
+# add both .local/bin and .sui/bin to PATH
+ENV PATH="/root/.local/bin:/root/.sui/bin:${PATH}"
+
+# create symlinks for easy access (optional, but helpful)
+RUN mkdir -p /usr/local/bin && \
+    ln -sf /root/.local/bin/suiup /usr/local/bin/suiup || true
 
 # copy compiled binary from builder stage
 COPY --from=builder /app/target/release/* /usr/local/bin/
