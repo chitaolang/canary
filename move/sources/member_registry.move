@@ -64,44 +64,6 @@ fun init(ctx: &mut TxContext) {
     transfer::transfer(admin_cap, sender);
 }
 
-// Verify membership
-public fun verify_membership(cap: &MembershipCap, registry: &Registry): address {
-    assert!(cap.registry_id == object::id(registry), EInvalidCap);
-    cap.member
-}
-
-entry fun seal_approve(cap: &MembershipCap, registry: &Registry, ctx: &TxContext) {
-    assert!(cap.registry_id == object::id(registry), EInvalidCap);
-}
-
-// Verify admin
-public fun verify_admin(admin_cap: &AdminCap, registry: &Registry) {
-    assert!(admin_cap.registry_id == object::id(registry), ENotAdmin);
-}
-
-// Check if member
-public fun is_member(registry: &Registry, addr: address): bool {
-    table::contains(&registry.members, addr)
-}
-
-// Get member info
-public fun get_member_info(registry: &Registry, addr: address): &MemberInfo {
-    table::borrow(&registry.members, addr)
-}
-
-public fun get_admin(registry: &Registry): address {
-    registry.admin
-}
-
-// === 獲取 Registry UID（給其他 module 用於派生）===
-public fun registry_uid(registry: &Registry): &UID {
-    &registry.id
-}
-
-public fun registry_uid_mut(registry: &mut Registry): &mut UID {
-    &mut registry.id
-}
-
 // Join registry
 public entry fun join_registry(
     registry: &mut Registry,
@@ -164,4 +126,42 @@ public entry fun remove_member(registry: &mut Registry, admin_cap: &AdminCap, me
     verify_admin(admin_cap, registry);
     assert!(table::contains(&registry.members, member), ENotMember);
     table::remove(&mut registry.members, member);
+}
+
+// Verify membership
+public fun verify_membership(cap: &MembershipCap, registry: &Registry): address {
+    assert!(cap.registry_id == object::id(registry), EInvalidCap);
+    cap.member
+}
+
+entry fun seal_approve(cap: &MembershipCap, registry: &Registry, ctx: &TxContext) {
+    assert!(cap.registry_id == object::id(registry), EInvalidCap);
+}
+
+// Verify admin
+public fun verify_admin(admin_cap: &AdminCap, registry: &Registry) {
+    assert!(admin_cap.registry_id == object::id(registry), ENotAdmin);
+}
+
+// Check if member
+public fun is_member(registry: &Registry, addr: address): bool {
+    table::contains(&registry.members, addr)
+}
+
+// Get member info
+public fun get_member_info(registry: &Registry, addr: address): &MemberInfo {
+    table::borrow(&registry.members, addr)
+}
+
+public fun get_admin(registry: &Registry): address {
+    registry.admin
+}
+
+// === 獲取 Registry UID（給其他 module 用於派生）===
+public fun registry_uid(registry: &Registry): &UID {
+    &registry.id
+}
+
+public fun registry_uid_mut(registry: &mut Registry): &mut UID {
+    &mut registry.id
 }
