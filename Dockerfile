@@ -1,4 +1,5 @@
 # builder stage
+# rust:1.75-slim 镜像已经包含了 Rust 和 Cargo，无需单独安装
 FROM rust:1.75-slim as builder
 
 # install necessary system dependencies
@@ -9,12 +10,21 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+# 验证 Rust 和 Cargo 已安装
+RUN rustc --version && cargo --version
+
 # install suiup
 RUN curl -fsSL https://get.sui.io | sh
 ENV PATH="/root/.sui/bin:${PATH}"
 
-# install sui toolchain (via suiup)
-RUN /root/.sui/bin/suiup install stable
+# install sui, walrus, and mvr via suiup
+# Note: Network will be configured at runtime via SUI_NETWORK environment variable
+RUN /root/.sui/bin/suiup install stable && \
+    /root/.sui/bin/suiup install walrus -y && \
+    /root/.sui/bin/suiup install mvr
+
+# verify installations
+RUN sui --version && walrus --version && mvr --version
 
 # set working directory
 WORKDIR /app
@@ -37,13 +47,12 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# install suiup and sui toolchain
-RUN curl -fsSL https://get.sui.io | sh
-ENV PATH="/root/.sui/bin:${PATH}"
-RUN /root/.sui/bin/suiup install stable
-
 # copy compiled binary from builder stage
 COPY --from=builder /app/target/release/* /usr/local/bin/
+
+# copy entrypoint script
+COPY backend/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # create application directory
 WORKDIR /app
@@ -54,6 +63,7 @@ WORKDIR /app
 # set environment variable (default value, can be overridden via .env)
 ENV RUST_LOG=info
 
-# run application
+# use entrypoint script to set network before running application
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["/usr/local/bin/canary-worker"]
 
