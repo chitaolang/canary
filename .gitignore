@@ -3,6 +3,8 @@ move/traces/*
 move/.trace
 move/.coverage*
 
+backend/target/*
+
 # Environment files
 .env
 !.env.example
