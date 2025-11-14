@@ -15,7 +15,8 @@ const EDerivedObjectAlreadyExists: u64 = 1;
 // === Derived Object struct ===
 public struct CanaryBlob has key {
     id: UID,
-    blob_id: address,
+    contract_blob_id: address,
+    explain_blob_id: address,
     package_id: address,
     domain: String,
     uploaded_at: u64,
@@ -33,7 +34,8 @@ public entry fun store_blob(
     registry: &mut Registry,
     admin_cap: &AdminCap,
     domain: String,
-    blob_id: address,
+    contract_blob_id: address,
+    explain_blob_id: address,
     package_id: address,
     clock: &Clock,
     ctx: &mut TxContext,
@@ -59,7 +61,8 @@ public entry fun store_blob(
     let derived_uid = derived_object::claim(registry_uid, key);
     let canary_blob = CanaryBlob {
         id: derived_uid,
-        blob_id,
+        contract_blob_id,
+        explain_blob_id,
         package_id,
         domain: key.domain,
         uploaded_at: clock::timestamp_ms(clock),
@@ -74,14 +77,16 @@ public entry fun update_blob(
     registry: &Registry,
     admin_cap: &AdminCap,
     canary_blob: &mut CanaryBlob,
-    new_blob_id: address,
+    new_contract_blob_id: address,
+    new_explain_blob_id: address,
     clock: &Clock,
     ctx: &TxContext,
 ) {
     // 驗證 Admin 權限
     member_registry::verify_admin(admin_cap, registry);
 
-    canary_blob.blob_id = new_blob_id;
+    canary_blob.contract_blob_id = new_contract_blob_id;
+    canary_blob.explain_blob_id = new_explain_blob_id;
     canary_blob.uploaded_at = clock::timestamp_ms(clock);
     canary_blob.uploaded_by_admin = tx_context::sender(ctx);
 }
@@ -97,7 +102,8 @@ public entry fun delete_canary_blob(
 
     let CanaryBlob {
         id,
-        blob_id: _,
+        contract_blob_id: _,
+        explain_blob_id: _,
         package_id: _,
         domain: _,
         uploaded_at: _,
@@ -108,8 +114,8 @@ public entry fun delete_canary_blob(
 }
 
 // === Public Query Functions (Anyone can query) ===
-public fun get_blob_id(canary_blob: &CanaryBlob): address {
-    canary_blob.blob_id
+public fun get_blob_id(canary_blob: &CanaryBlob): (address, address) {
+    (canary_blob.contract_blob_id, canary_blob.explain_blob_id)
 }
 
 public fun get_package_id(canary_blob: &CanaryBlob): address {
@@ -128,9 +134,12 @@ public fun get_uploaded_at(canary_blob: &CanaryBlob): u64 {
     canary_blob.uploaded_at
 }
 
-public fun get_full_info(canary_blob: &CanaryBlob): (address, address, String, u64, address) {
+public fun get_full_info(
+    canary_blob: &CanaryBlob,
+): (address, address, address, String, u64, address) {
     (
-        canary_blob.blob_id,
+        canary_blob.contract_blob_id,
+        canary_blob.explain_blob_id,
         canary_blob.package_id,
         canary_blob.domain,
         canary_blob.uploaded_at,
