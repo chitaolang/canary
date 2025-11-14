@@ -1,6 +1,6 @@
 /*
-/// Module: canary
-module canary::canary;
+/// Module: member_registry
+module member_registry::member_registry;
 */
 
 // For Move coding conventions, see
