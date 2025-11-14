@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+backend/target/
+**/*.rs.bk
+backend/Cargo.lock
+
+# Move build artifacts
+move/build/
+move/traces/
+move/.trace
+move/.coverage*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Workspace
+backend/workspace/
+

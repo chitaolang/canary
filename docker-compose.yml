@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  canary-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: canary-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # map local move-decompiler to container
+      - ./backend/move-decompiler:/app/move-decompiler:ro
+      # map working directory (for temporary files)
+      - ./backend/workspace:/app/workspace
+    environment:
+      - RUST_LOG=${RUST_LOG:-info}
+    # if needed to run periodically, use cron or application internal timer
+    # here assume application has timer logic internally
+

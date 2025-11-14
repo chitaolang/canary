@@ -2,3 +2,7 @@ move/build/*
 move/traces/*
 move/.trace
 move/.coverage*
+
+# Environment files
+.env
+!.env.example
