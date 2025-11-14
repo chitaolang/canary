@@ -1,6 +1,6 @@
 /*
 #[test_only]
-module canary::canary_tests;
+module canary::member_registry_tests;
 // uncomment this line to import the module
 // use canary::canary;
 
