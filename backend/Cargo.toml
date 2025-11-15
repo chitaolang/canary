@@ -3,9 +3,14 @@ name = "canary-worker"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "canary_sdk"
+path = "src/lib.rs"
+
 [dependencies]
 # Sui SDK - using git dependency as crates.io may not have latest version
 sui_sdk = { git = "https://github.com/mystenlabs/sui", package = "sui-sdk"}
+sui_keys = { git = "https://github.com/mystenlabs/sui", package = "sui-keys" }
 
 # HTTP client
 reqwest = { version = "0.11", features = ["json"] }
@@ -34,3 +39,6 @@ thiserror = "1.0"
 
 # Seal SDK
 seal-sdk-rs = { git = "https://github.com/gfusee/seal-sdk-rs", tag = "0.0.2" }
+
+[dev-dependencies]
+rand = "0.8"
