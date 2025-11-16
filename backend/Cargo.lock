@@ -1147,6 +1147,7 @@ dependencies = [
  "seal-sdk-rs",
  "serde",
  "serde_json",
+ "shared-crypto 0.0.0 (git+https://github.com/mystenlabs/sui)",
  "sui-keys 0.0.0 (git+https://github.com/mystenlabs/sui)",
  "sui-sdk 1.62.0",
  "thiserror 1.0.69",
