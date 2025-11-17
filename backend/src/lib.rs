@@ -7,6 +7,7 @@
 //! - Transaction building
 //! - Canary contract helpers
 
+pub mod canary;
 pub mod client;
 pub mod error;
 pub mod keystore;
@@ -21,4 +22,7 @@ pub use client::{Network, SuiClientWithSigner};
 
 // Re-export transaction types for convenience
 pub use transaction::CanaryTransactionBuilder;
+
+// Re-export canary types for convenience
+pub use canary::{CanaryBlobInfo, MemberInfo, MemberInfoWithAddress, RegistryInfo};
 
