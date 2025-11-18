@@ -1,7 +1,6 @@
 use std::time::Duration;
 use tokio::time::sleep;
 
-use canary_sdk::canary::query_all_members;
 use canary_sdk::client::{create_sui_client, Network};
 use sui_sdk::types::base_types::ObjectID;
 
@@ -69,9 +68,6 @@ async fn run_task() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|e| format!("Invalid REGISTRY_ID format: {}", e))?;
 
     println!("Querying members for registry: {}", registry_id);
-
-    // Query all members
-    let members = query_all_members(&client, registry_id).await?;
 
     println!("Found {} members:", members.len());
     for (idx, member) in members.iter().enumerate() {

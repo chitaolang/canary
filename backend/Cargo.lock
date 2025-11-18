@@ -1141,6 +1141,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.22.1",
+ "bcs",
  "dotenv",
  "rand 0.9.2",
  "reqwest 0.12.24",

@@ -13,6 +13,7 @@ sui_sdk = { git = "https://github.com/mystenlabs/sui", package = "sui-sdk"}
 sui_types = { git = "https://github.com/mystenlabs/sui", package = "sui-types"}
 sui_keys = { git = "https://github.com/mystenlabs/sui", package = "sui-keys" }
 shared-crypto = { git = "https://github.com/mystenlabs/sui", package = "shared-crypto" }
+bcs = "0.1.4"
 
 # HTTP client
 reqwest = { version = "0.12.24", features = ["json"] }
