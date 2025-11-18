@@ -1,13 +1,151 @@
+# =============================================================================
+# Move/Sui Build Artifacts
+# =============================================================================
 move/build/*
 move/traces/*
 move/.trace
 move/.coverage*
 
-backend/target/*
+# =============================================================================
+# Backend - Node.js / TypeScript
+# =============================================================================
 
-# Environment files
+# Dependencies
+backend/node_modules/
+backend/.pnp
+backend/.pnp.js
+backend/jspm_packages/
+
+# Build outputs
+backend/dist/
+backend/build/
+backend/*.tsbuildinfo
+
+# TypeScript incremental compilation
+backend/tsconfig.tsbuildinfo
+
+# Test coverage
+backend/coverage/
+backend/.nyc_output
+backend/*.lcov
+
+# Logs
+backend/logs/
+backend/*.log
+backend/npm-debug.log*
+backend/yarn-debug.log*
+backend/yarn-error.log*
+backend/lerna-debug.log*
+backend/.pnpm-debug.log*
+
+# Runtime data
+backend/pids/
+backend/*.pid
+backend/*.seed
+backend/*.pid.lock
+
+# Optional npm cache
+backend/.npm/
+
+# Optional eslint cache
+backend/.eslintcache
+
+# Optional REPL history
+backend/.node_repl_history
+
+# Package manager outputs
+backend/*.tgz
+backend/*.tar.gz
+
+# Yarn (Berry v2+)
+backend/.yarn/cache/
+backend/.yarn/unplugged/
+backend/.yarn/build-state.yml
+backend/.yarn/install-state.gz
+backend/.pnp.*
+
+# =============================================================================
+# Environment & Secrets
+# =============================================================================
 .env
+.env.local
+.env.*.local
 !.env.example
 
 # Account files (may contain sensitive information)
 backend/account.json
+*.key
+*.pem
+*.p12
+*.pfx
+
+# =============================================================================
+# IDE & Editor Files
+# =============================================================================
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+
+# =============================================================================
+# OS Files
+# =============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# =============================================================================
+# Docker
+# =============================================================================
+*.log
+docker-compose.override.yml
+
+# =============================================================================
+# Temporary Files
+# =============================================================================
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.cache
+
+# =============================================================================
+# TypeScript
+# =============================================================================
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# =============================================================================
+# Testing
+# =============================================================================
+.jest/
+coverage/
+.nyc_output/
+*.lcov
+
+# =============================================================================
+# Misc
+# =============================================================================
+*.orig
+*.rej
+.cache/
+.parcel-cache/
+.next/
+out/
+.nuxt/
+.vuepress/dist/
+.serverless/
+.fusebox/
+.dynamodb/
+.tern-port
+
