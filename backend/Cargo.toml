@@ -10,7 +10,7 @@ path = "src/lib.rs"
 [dependencies]
 # Sui SDK - using git dependency as crates.io may not have latest version
 sui_sdk = { git = "https://github.com/mystenlabs/sui", package = "sui-sdk"}
-sui_types = '0.01'
+sui_types = { git = "https://github.com/mystenlabs/sui", package = "sui-types"}
 sui_keys = { git = "https://github.com/mystenlabs/sui", package = "sui-keys" }
 shared-crypto = { git = "https://github.com/mystenlabs/sui", package = "shared-crypto" }
 

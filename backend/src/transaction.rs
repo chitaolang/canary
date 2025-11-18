@@ -5,13 +5,20 @@
 
 use crate::client::SuiClientWithSigner;
 use crate::error::TransactionError;
+use shared_crypto::intent::Intent;
 use sui_keys::keystore::AccountKeystore;
-use sui_sdk::rpc_types::{SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponse};
+use sui_sdk::rpc_types::SuiTransactionBlockResponseOptions;
+use sui_sdk::rpc_types::{
+    SuiObjectDataOptions, SuiTransactionBlockEffectsAPI, SuiTransactionBlockResponse,
+};
 use sui_sdk::types::base_types::{ObjectID, SuiAddress};
 use sui_sdk::types::programmable_transaction_builder::ProgrammableTransactionBuilder;
 use sui_sdk::types::transaction::CallArg;
+use sui_sdk::types::transaction::Transaction;
 use sui_sdk::types::transaction::TransactionData;
 use sui_sdk::SuiClient;
+use sui_types::base_types::SequenceNumber;
+use sui_types::quorum_driver_types::ExecuteTransactionRequestType;
 
 /// A builder for creating and executing Sui transactions
 ///
@@ -105,7 +112,7 @@ impl CanaryTransactionBuilder {
         // Convert strings to Identifier types for move_call
         // Identifier is in sui_types::identifier, accessed through sui_sdk
         use std::str::FromStr;
-        use sui_sdk::types::identifier::Identifier;
+        use sui_types::Identifier;
         let module_id = Identifier::from_str(module)
             .map_err(|e| TransactionError::BuildError(format!("Invalid module name: {}", e)))?;
         let function_id = Identifier::from_str(function)
@@ -137,7 +144,7 @@ impl CanaryTransactionBuilder {
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// # let client_with_signer = todo!();
     /// let mut builder = CanaryTransactionBuilder::new(client_with_signer);
-    /// let recipient = SuiAddress::from_hex_literal("0x123...")?;
+    /// let recipient = SuiAddress::from_str("0x123...")?;
     /// builder.transfer_sui(recipient, 1_000_000_000)?; // Transfer 1 SUI
     /// # Ok(())
     /// # }
@@ -185,14 +192,12 @@ impl CanaryTransactionBuilder {
             })?;
 
         // Use the object_ref() method to get the object reference tuple
-        // Convert to FullObjectRef for transfer_object
+        // FullObjectRef is a tuple struct (FullObjectID, SequenceNumber, ObjectDigest)
         let object_ref = object.object_ref();
-        use sui_sdk::types::fullnode_api::FullObjectRef;
-        let full_ref = FullObjectRef {
-            object_id: object_ref.0,
-            version: object_ref.1,
-            digest: object_ref.2,
-        };
+        use sui_types::base_types::{FullObjectID, FullObjectRef};
+        // FullObjectID is an enum with Consensus variant that takes (ObjectID, SequenceNumber)
+        let full_object_id = FullObjectID::Consensus((object_ref.0, object_ref.1));
+        let full_ref = FullObjectRef(full_object_id, object_ref.1, object_ref.2);
 
         self.builder
             .transfer_object(recipient, full_ref)
@@ -415,46 +420,30 @@ impl CanaryTransactionBuilder {
     /// ```
     pub async fn execute(&mut self) -> Result<SuiTransactionBlockResponse, TransactionError> {
         // Build the transaction
-        let transaction_data = self.build().await?;
-
-        // Sign the transaction using the keystore
-        // The sign_secure method requires an Intent - use sui_transaction intent from shared_crypto
-        // Note: shared_crypto is a transitive dependency of sui_sdk
-        use shared_crypto::intent::Intent;
-        let intent = Intent::sui_transaction();
+        let tx_data = self.build().await?;
         let signature = self
             .keystore
-            .sign_secure(&self.signer, &transaction_data, intent)
+            .sign_secure(&self.signer, &tx_data, Intent::sui_transaction())
             .await
             .map_err(|e| {
                 TransactionError::BuildError(format!("Failed to sign transaction: {}", e))
             })?;
 
-        // Create the signed transaction envelope
-        let signed_tx = sui_sdk::types::transaction::SenderSignedData::new(
-            transaction_data,
-            vec![signature.into()],
-        );
-
-        // Wrap in Envelope for execution - use the specific type to disambiguate
-        use sui_sdk::types::message_envelope::EmptySignInfo;
-        use sui_sdk::types::message_envelope::Envelope;
-        let envelope =
-            Envelope::<sui_sdk::types::transaction::SenderSignedData, EmptySignInfo>::new(
-                signed_tx,
-            );
-
-        // Execute the transaction
         let response = self
             .client
             .quorum_driver_api()
             .execute_transaction_block(
-                envelope,
-                sui_sdk::rpc_types::SuiTransactionBlockResponseOptions::full_content(),
-                None,
+                Transaction::from_data(tx_data, vec![signature]),
+                SuiTransactionBlockResponseOptions::new()
+                    .with_effects()
+                    .with_events()
+                    .with_balance_changes(),
+                Some(ExecuteTransactionRequestType::WaitForLocalExecution),
             )
             .await
-            .map_err(|e| TransactionError::ExecutionError(e.to_string()))?;
+            .map_err(|e| {
+                TransactionError::ExecutionError(format!("Failed to execute transaction: {}", e))
+            })?;
 
         Ok(response)
     }
@@ -463,7 +452,8 @@ impl CanaryTransactionBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sui_keys::keystore::{AccountKeystore, InMemKeystore};
+    use std::str::FromStr;
+    use sui_keys::keystore::{AccountKeystore, InMemKeystore, Keystore};
     use sui_sdk::types::base_types::SuiAddress;
     use sui_sdk::types::crypto::SuiKeyPair;
     use sui_sdk::SuiClientBuilder;
@@ -472,12 +462,13 @@ mod tests {
     /// This creates a temporary keystore with a random key for testing
     async fn create_test_client_with_signer() -> SuiClientWithSigner {
         // Generate a random keypair for testing
-        let keypair = SuiKeyPair::generate(&mut rand::thread_rng());
-        let address = SuiAddress::from(&keypair.public());
+        use sui_sdk::types::crypto::deterministic_random_account_key;
+        let (address, kp) = deterministic_random_account_key();
+        let keypair = SuiKeyPair::Ed25519(kp);
 
         // Create an in-memory keystore and add the key
-        let mut keystore = InMemKeystore::new();
-        keystore.add_key(address, keypair).unwrap();
+        let mut keystore = Keystore::InMem(InMemKeystore::default());
+        keystore.import(None, keypair).await.unwrap();
 
         // Create a client (this will fail if network is not available, but that's OK for unit tests)
         let client = SuiClientBuilder::default()
@@ -492,7 +483,7 @@ mod tests {
         SuiClientWithSigner {
             client,
             signer: address,
-            keystore: keystore.into(),
+            keystore,
         }
     }
 
@@ -509,8 +500,8 @@ mod tests {
     async fn test_builder_creation_with_network() {
         // This test requires a network connection
         // It will be skipped unless explicitly run with --ignored
-        let result = create_test_client_with_signer().await;
-        let builder = CanaryTransactionBuilder::new(result);
+        let _result = create_test_client_with_signer().await;
+        let _builder = CanaryTransactionBuilder::new(_result);
 
         // Verify builder was created
         // We can't easily inspect private fields, but if new() succeeds, it's working
@@ -550,7 +541,7 @@ mod tests {
         let client_with_signer = create_test_client_with_signer().await;
         let mut builder = CanaryTransactionBuilder::new(client_with_signer);
 
-        let recipient = SuiAddress::from_hex_literal("0x1").unwrap();
+        let recipient = SuiAddress::from_str("0x1").unwrap();
         let result = builder.transfer_sui(recipient, 1_000_000_000);
 
         assert!(result.is_ok());
@@ -564,7 +555,7 @@ mod tests {
         let mut builder = CanaryTransactionBuilder::new(client_with_signer);
 
         let package_id = ObjectID::from_hex_literal("0x2").unwrap();
-        let recipient = SuiAddress::from_hex_literal("0x1").unwrap();
+        let recipient = SuiAddress::from_str("0x1").unwrap();
 
         // Chain multiple operations
         let result = builder

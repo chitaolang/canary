@@ -11,6 +11,7 @@ use sui_sdk::rpc_types::{SuiObjectDataOptions, SuiTransactionBlockEffectsAPI};
 use sui_sdk::types::base_types::{ObjectID, SuiAddress};
 use sui_sdk::types::transaction::{CallArg, ObjectArg, SharedObjectMutability};
 use sui_sdk::SuiClient;
+use sui_types::base_types::SequenceNumber;
 
 /// Information about a Registry object
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -97,20 +98,14 @@ pub struct CanaryBlobInfo {
 /// # }
 /// ```
 pub async fn join_registry(
-    client: &SuiClientWithSigner,
+    client: SuiClientWithSigner,
     registry_id: ObjectID,
     domain: String,
     payment_amount: u64,
 ) -> Result<sui_sdk::rpc_types::SuiTransactionBlockResponse, CanaryError> {
     // Get the Clock object ID (0x6 is the Clock object)
-    let clock_id = ObjectID::from_hex_literal("0x6")?;
-
-    // Create a transaction builder
-    let mut builder = CanaryTransactionBuilder::new(SuiClientWithSigner {
-        client: client.client.clone(),
-        signer: client.signer,
-        keystore: client.keystore.clone(),
-    });
+    let clock_id = ObjectID::from_hex_literal("0x6")
+        .map_err(|e| CanaryError::Registry(format!("Failed to parse Clock object ID: {}", e)))?;
 
     // Get the package ID - we need to get it from the registry object
     // For now, we'll need the package ID as a parameter or derive it
@@ -125,7 +120,10 @@ pub async fn join_registry(
         .await
         .map_err(|e| CanaryError::Registry(format!("Failed to get registry object: {}", e)))?
         .into_object()
-        .ok_or_else(|| CanaryError::Registry("Registry object not found".to_string()))?;
+        .map_err(|_| CanaryError::Registry("Registry object not found".to_string()))?;
+
+    // Get the object reference before moving the type field
+    let registry_ref = registry_obj.object_ref();
 
     // Extract package ID from the object type
     // The type should be something like "0x<PACKAGE_ID>::member_registry::Registry"
@@ -166,7 +164,10 @@ pub async fn join_registry(
         .await
         .map_err(|e| CanaryError::Registry(format!("Failed to get payment coin: {}", e)))?
         .into_object()
-        .ok_or_else(|| CanaryError::Registry("Payment coin object not found".to_string()))?;
+        .map_err(|_| CanaryError::Registry("Payment coin object not found".to_string()))?;
+
+    // Create a transaction builder (after we've extracted all needed data)
+    let mut builder = CanaryTransactionBuilder::new(client);
 
     // Split the coin if needed (if the coin value is greater than payment_amount)
     // For simplicity, we'll use the coin directly if it matches, otherwise we need to split
@@ -174,7 +175,6 @@ pub async fn join_registry(
 
     // Build the move_call arguments
     // join_registry(registry: &mut Registry, payment: Coin<SUI>, domain: String, clock: &Clock, ctx: &mut TxContext)
-    let registry_ref = registry_obj.object_ref();
     use sui_sdk::types::transaction::SharedObjectMutability;
     let args = vec![
         CallArg::Object(ObjectArg::SharedObject {
@@ -183,13 +183,10 @@ pub async fn join_registry(
             mutability: SharedObjectMutability::Mutable,
         }),
         CallArg::Object(ObjectArg::ImmOrOwnedObject(payment_coin_obj.object_ref())),
-        CallArg::Pure(
-            bcs::to_bytes(&domain)
-                .map_err(|e| CanaryError::Registry(format!("Failed to serialize domain: {}", e)))?,
-        ),
+        CallArg::Pure(domain.as_bytes().to_vec()),
         CallArg::Object(ObjectArg::SharedObject {
             id: clock_id,
-            initial_shared_version: 1, // Clock is always at version 1
+            initial_shared_version: SequenceNumber::from(1), // Clock is always at version 1
             mutability: SharedObjectMutability::Immutable,
         }),
     ];
@@ -246,7 +243,7 @@ pub async fn query_registry(
         .await
         .map_err(|e| CanaryError::Registry(format!("Failed to get registry object: {}", e)))?
         .into_object()
-        .ok_or_else(|| CanaryError::Registry("Registry object not found".to_string()))?;
+        .map_err(|_| CanaryError::Registry("Registry object not found".to_string()))?;
 
     // Extract package ID from type
     let object_type = registry_obj
@@ -320,7 +317,7 @@ pub async fn query_member(
         .await
         .map_err(|e| CanaryError::Registry(format!("Failed to get registry object: {}", e)))?
         .into_object()
-        .ok_or_else(|| CanaryError::Registry("Registry object not found".to_string()))?;
+        .map_err(|_| CanaryError::Registry("Registry object not found".to_string()))?;
 
     let object_type = registry_obj
         .type_
@@ -340,96 +337,6 @@ pub async fn query_member(
     let member_info = query_member_info(client, package_id, registry_id, member_address).await?;
 
     Ok(Some(member_info))
-}
-
-/// Query all members in the registry
-///
-/// # Arguments
-///
-/// * `client` - A `SuiClient` for querying
-/// * `registry_id` - The Registry object ID
-///
-/// # Returns
-///
-/// Returns a vector of `MemberInfoWithAddress` containing all members,
-/// or a `CanaryError` if the query fails.
-///
-/// # Example
-///
-/// ```rust,no_run
-/// use canary_sdk::canary::query_all_members;
-/// use canary_sdk::client::{create_sui_client, Network};
-/// use sui_sdk::types::base_types::ObjectID;
-///
-/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let client = create_sui_client(Network::Devnet).await?;
-/// let registry_id = ObjectID::from_hex_literal("0x123...")?;
-/// let members = query_all_members(&client, registry_id).await?;
-/// for member in members {
-///     println!("Member: {} - Domain: {}", member.member, member.domain);
-/// }
-/// # Ok(())
-/// # }
-/// ```
-pub async fn query_all_members(
-    client: &SuiClient,
-    registry_id: ObjectID,
-) -> Result<Vec<MemberInfoWithAddress>, CanaryError> {
-    // Get the registry object to extract package ID
-    let registry_obj = client
-        .read_api()
-        .get_object_with_options(registry_id, SuiObjectDataOptions::full_content())
-        .await
-        .map_err(|e| CanaryError::Registry(format!("Failed to get registry object: {}", e)))?
-        .into_object()
-        .ok_or_else(|| CanaryError::Registry("Registry object not found".to_string()))?;
-
-    let object_type = registry_obj
-        .type_
-        .ok_or_else(|| CanaryError::Registry("Registry object has no type".to_string()))?;
-
-    let package_id = extract_package_id_from_type(&object_type.to_string())
-        .ok_or_else(|| CanaryError::Registry("Failed to extract package ID".to_string()))?;
-
-    // Use dev_inspect to call get_all_members
-    // get_all_members(registry: &Registry): vector<MemberInfoWithAddress>
-    let result = dev_inspect_call(
-        client,
-        package_id,
-        "member_registry",
-        "get_all_members",
-        vec![CallArg::Object(ObjectArg::SharedObject {
-            id: registry_id,
-            initial_shared_version: registry_obj.object_ref().1, // version from object_ref
-            mutability: SharedObjectMutability::Immutable,
-        })],
-    )
-    .await?;
-
-    // The result should be a single vector value
-    if result.is_empty() {
-        return Err(CanaryError::Registry(
-            "get_all_members returned no value".to_string(),
-        ));
-    }
-
-    // Parse the vector of MemberInfoWithAddress
-    // The vector is returned as BCS-encoded bytes
-    let members_vec: Vec<(SuiAddress, String, u64)> = bcs::from_bytes(&result[0]).map_err(|e| {
-        CanaryError::Registry(format!("Failed to deserialize members vector: {}", e))
-    })?;
-
-    // Convert to MemberInfoWithAddress
-    let members: Vec<MemberInfoWithAddress> = members_vec
-        .into_iter()
-        .map(|(member, domain, joined_at)| MemberInfoWithAddress {
-            member,
-            domain,
-            joined_at,
-        })
-        .collect();
-
-    Ok(members)
 }
 
 // ============================================================================
@@ -452,7 +359,7 @@ pub async fn query_all_members(
 ///
 /// Returns the transaction response, or a `CanaryError` if the operation fails.
 pub async fn store_blob(
-    client: &SuiClientWithSigner,
+    client: SuiClientWithSigner,
     registry_id: ObjectID,
     admin_cap_id: ObjectID,
     domain: String,
@@ -461,7 +368,8 @@ pub async fn store_blob(
     package_id: ObjectID,
 ) -> Result<sui_sdk::rpc_types::SuiTransactionBlockResponse, CanaryError> {
     // Get the Clock object ID
-    let clock_id = ObjectID::from_hex_literal("0x6")?;
+    let clock_id = ObjectID::from_hex_literal("0x6")
+        .map_err(|e| CanaryError::Registry(format!("Failed to parse Clock object ID: {}", e)))?;
 
     // Get the package ID from the registry object
     let registry_obj = client
@@ -471,7 +379,8 @@ pub async fn store_blob(
         .await
         .map_err(|e| CanaryError::Registry(format!("Failed to get registry object: {}", e)))?
         .into_object()
-        .ok_or_else(|| CanaryError::Registry("Registry object not found".to_string()))?;
+        .map_err(|_| CanaryError::Registry("Registry object not found".to_string()))?;
+    let registry_ref = registry_obj.object_ref();
 
     let object_type = registry_obj
         .type_
@@ -488,13 +397,12 @@ pub async fn store_blob(
         .await
         .map_err(|e| CanaryError::Registry(format!("Failed to get admin cap: {}", e)))?
         .into_object()
-        .ok_or_else(|| CanaryError::Registry("Admin cap not found".to_string()))?;
+        .map_err(|_| CanaryError::Registry("Admin cap not found".to_string()))?;
 
     // Build the move_call arguments
     // store_blob(registry: &mut Registry, admin_cap: &AdminCap, domain: String,
     //            contract_blob_id: address, explain_blob_id: address, package_id: address,
     //            clock: &Clock, ctx: &mut TxContext)
-    let registry_ref = registry_obj.object_ref();
     let args = vec![
         CallArg::Object(ObjectArg::SharedObject {
             id: registry_id,
@@ -502,31 +410,18 @@ pub async fn store_blob(
             mutability: SharedObjectMutability::Mutable,
         }),
         CallArg::Object(ObjectArg::ImmOrOwnedObject(admin_cap_obj.object_ref())),
-        CallArg::Pure(
-            bcs::to_bytes(&domain)
-                .map_err(|e| CanaryError::Registry(format!("Failed to serialize domain: {}", e)))?,
-        ),
-        CallArg::Pure(bcs::to_bytes(&contract_blob_id).map_err(|e| {
-            CanaryError::Registry(format!("Failed to serialize contract_blob_id: {}", e))
-        })?),
-        CallArg::Pure(bcs::to_bytes(&explain_blob_id).map_err(|e| {
-            CanaryError::Registry(format!("Failed to serialize explain_blob_id: {}", e))
-        })?),
-        CallArg::Pure(bcs::to_bytes(&package_id).map_err(|e| {
-            CanaryError::Registry(format!("Failed to serialize package_id: {}", e))
-        })?),
+        CallArg::Pure(domain.as_bytes().to_vec()),
+        CallArg::Pure(contract_blob_id.to_vec()),
+        CallArg::Pure(explain_blob_id.to_vec()),
+        CallArg::Pure(package_id.to_vec()),
         CallArg::Object(ObjectArg::SharedObject {
             id: clock_id,
-            initial_shared_version: 1,
+            initial_shared_version: SequenceNumber::from(1),
             mutability: SharedObjectMutability::Immutable,
         }),
     ];
 
-    let mut builder = CanaryTransactionBuilder::new(SuiClientWithSigner {
-        client: client.client.clone(),
-        signer: client.signer,
-        keystore: client.keystore.clone(),
-    });
+    let mut builder = CanaryTransactionBuilder::new(client);
 
     builder
         .move_call(canary_package_id, "pkg_storage", "store_blob", args)
@@ -560,7 +455,7 @@ pub async fn store_blob(
 /// The Move function `update_blob` requires a `registry` parameter, so `registry_id` is needed.
 /// This is a reasonable extension to the plan's function signature.
 pub async fn update_blob(
-    client: &SuiClientWithSigner,
+    client: SuiClientWithSigner,
     registry_id: ObjectID,
     admin_cap_id: ObjectID,
     canary_blob_id: ObjectID,
@@ -568,7 +463,8 @@ pub async fn update_blob(
     new_explain_blob_id: ObjectID,
 ) -> Result<sui_sdk::rpc_types::SuiTransactionBlockResponse, CanaryError> {
     // Get the Clock object ID
-    let clock_id = ObjectID::from_hex_literal("0x6")?;
+    let clock_id = ObjectID::from_hex_literal("0x6")
+        .map_err(|e| CanaryError::Registry(format!("Failed to parse Clock object ID: {}", e)))?;
 
     // Get the canary blob object to extract package ID and registry info
     let canary_blob_obj = client
@@ -580,7 +476,10 @@ pub async fn update_blob(
 
     let canary_blob = canary_blob_obj
         .into_object()
-        .ok_or_else(|| CanaryError::CanaryBlobNotFound)?;
+        .map_err(|_| CanaryError::CanaryBlobNotFound)?;
+
+    // Get the object reference before moving the type field
+    let canary_blob_ref = canary_blob.object_ref();
 
     let object_type = canary_blob
         .type_
@@ -597,7 +496,7 @@ pub async fn update_blob(
         .await
         .map_err(|e| CanaryError::Registry(format!("Failed to get admin cap: {}", e)))?
         .into_object()
-        .ok_or_else(|| CanaryError::Registry("Admin cap not found".to_string()))?;
+        .map_err(|_| CanaryError::Registry("Admin cap not found".to_string()))?;
 
     // Get registry object
     let registry_obj = client
@@ -607,7 +506,7 @@ pub async fn update_blob(
         .await
         .map_err(|e| CanaryError::Registry(format!("Failed to get registry: {}", e)))?
         .into_object()
-        .ok_or_else(|| CanaryError::Registry("Registry not found".to_string()))?;
+        .map_err(|_| CanaryError::Registry("Registry not found".to_string()))?;
 
     // Build the move_call arguments
     // update_blob(registry: &Registry, admin_cap: &AdminCap, canary_blob: &mut CanaryBlob,
@@ -621,27 +520,19 @@ pub async fn update_blob(
         CallArg::Object(ObjectArg::ImmOrOwnedObject(admin_cap_obj.object_ref())),
         CallArg::Object(ObjectArg::SharedObject {
             id: canary_blob_id,
-            initial_shared_version: canary_blob.object_ref().1, // version from object_ref
+            initial_shared_version: canary_blob_ref.1, // version from object_ref
             mutability: SharedObjectMutability::Mutable,
         }),
-        CallArg::Pure(bcs::to_bytes(&new_contract_blob_id).map_err(|e| {
-            CanaryError::Registry(format!("Failed to serialize new_contract_blob_id: {}", e))
-        })?),
-        CallArg::Pure(bcs::to_bytes(&new_explain_blob_id).map_err(|e| {
-            CanaryError::Registry(format!("Failed to serialize new_explain_blob_id: {}", e))
-        })?),
+        CallArg::Pure(new_contract_blob_id.to_vec()),
+        CallArg::Pure(new_explain_blob_id.to_vec()),
         CallArg::Object(ObjectArg::SharedObject {
             id: clock_id,
-            initial_shared_version: 1,
+            initial_shared_version: SequenceNumber::from(1),
             mutability: SharedObjectMutability::Immutable,
         }),
     ];
 
-    let mut builder = CanaryTransactionBuilder::new(SuiClientWithSigner {
-        client: client.client.clone(),
-        signer: client.signer,
-        keystore: client.keystore.clone(),
-    });
+    let mut builder = CanaryTransactionBuilder::new(client);
 
     builder
         .move_call(canary_package_id, "pkg_storage", "update_blob", args)
@@ -668,7 +559,7 @@ pub async fn update_blob(
 ///
 /// Returns the transaction response, or a `CanaryError` if the operation fails.
 pub async fn delete_canary_blob(
-    client: &SuiClientWithSigner,
+    client: SuiClientWithSigner,
     registry_id: ObjectID,
     admin_cap_id: ObjectID,
     canary_blob_id: ObjectID,
@@ -681,7 +572,10 @@ pub async fn delete_canary_blob(
         .await
         .map_err(|_| CanaryError::CanaryBlobNotFound)?
         .into_object()
-        .ok_or_else(|| CanaryError::CanaryBlobNotFound)?;
+        .map_err(|_| CanaryError::CanaryBlobNotFound)?;
+
+    // Get the object reference before moving the type field
+    let canary_blob_obj_ref = canary_blob_obj.object_ref();
 
     let object_type = canary_blob_obj
         .type_
@@ -698,7 +592,7 @@ pub async fn delete_canary_blob(
         .await
         .map_err(|e| CanaryError::Registry(format!("Failed to get registry: {}", e)))?
         .into_object()
-        .ok_or_else(|| CanaryError::Registry("Registry not found".to_string()))?;
+        .map_err(|_| CanaryError::Registry("Registry not found".to_string()))?;
 
     // Get admin cap object
     let admin_cap_obj = client
@@ -708,7 +602,7 @@ pub async fn delete_canary_blob(
         .await
         .map_err(|e| CanaryError::Registry(format!("Failed to get admin cap: {}", e)))?
         .into_object()
-        .ok_or_else(|| CanaryError::Registry("Admin cap not found".to_string()))?;
+        .map_err(|_| CanaryError::Registry("Admin cap not found".to_string()))?;
 
     // Build the move_call arguments
     // delete_canary_blob(registry: &Registry, admin_cap: &AdminCap, canary_blob: CanaryBlob)
@@ -719,14 +613,10 @@ pub async fn delete_canary_blob(
             mutability: SharedObjectMutability::Immutable,
         }),
         CallArg::Object(ObjectArg::ImmOrOwnedObject(admin_cap_obj.object_ref())),
-        CallArg::Object(ObjectArg::ImmOrOwnedObject(canary_blob_obj.object_ref())),
+        CallArg::Object(ObjectArg::ImmOrOwnedObject(canary_blob_obj_ref)),
     ];
 
-    let mut builder = CanaryTransactionBuilder::new(SuiClientWithSigner {
-        client: client.client.clone(),
-        signer: client.signer,
-        keystore: client.keystore.clone(),
-    });
+    let mut builder = CanaryTransactionBuilder::new(client);
 
     builder
         .move_call(canary_package_id, "pkg_storage", "delete_canary_blob", args)
@@ -765,7 +655,7 @@ pub async fn derive_canary_address(
         .await
         .map_err(|e| CanaryError::Registry(format!("Failed to get registry object: {}", e)))?
         .into_object()
-        .ok_or_else(|| CanaryError::Registry("Registry object not found".to_string()))?;
+        .map_err(|_| CanaryError::Registry("Registry object not found".to_string()))?;
 
     let object_type = registry_obj
         .type_
@@ -773,6 +663,12 @@ pub async fn derive_canary_address(
 
     let canary_package_id = extract_package_id_from_type(&object_type.to_string())
         .ok_or_else(|| CanaryError::Registry("Failed to extract package ID".to_string()))?;
+
+    let initial_shared_version = get_initial_shared_version(client, registry_id)
+        .await
+        .map_err(|e| {
+            CanaryError::Registry(format!("Failed to get initial shared version: {}", e))
+        })?;
 
     // Use dev_inspect to call derive_canary_address
     // derive_canary_address(registry: &Registry, domain: String, package_id: address): address
@@ -784,17 +680,11 @@ pub async fn derive_canary_address(
         vec![
             CallArg::Object(ObjectArg::SharedObject {
                 id: registry_id,
-                initial_shared_version: registry_obj.previous_transaction.ok_or_else(|| {
-                    CanaryError::Registry("Registry has no previous transaction".to_string())
-                })?,
+                initial_shared_version: initial_shared_version,
                 mutability: SharedObjectMutability::Immutable,
             }),
-            CallArg::Pure(bcs::to_bytes(&domain).map_err(|e| {
-                CanaryError::Registry(format!("Failed to serialize domain: {}", e))
-            })?),
-            CallArg::Pure(bcs::to_bytes(&package_id).map_err(|e| {
-                CanaryError::Registry(format!("Failed to serialize package_id: {}", e))
-            })?),
+            CallArg::Pure(domain.as_bytes().to_vec()),
+            CallArg::Pure(package_id.to_vec()),
         ],
     )
     .await?;
@@ -851,7 +741,7 @@ pub async fn query_canary_blob(
         .await
         .map_err(|_| CanaryError::CanaryBlobNotFound)?
         .into_object()
-        .ok_or_else(|| CanaryError::CanaryBlobNotFound)?;
+        .map_err(|_| CanaryError::CanaryBlobNotFound)?;
 
     let object_type = canary_blob_obj
         .type_
@@ -859,6 +749,11 @@ pub async fn query_canary_blob(
 
     let canary_package_id = extract_package_id_from_type(&object_type.to_string())
         .ok_or_else(|| CanaryError::CanaryBlobNotFound)?;
+    let initial_shared_version = get_initial_shared_version(client, canary_blob_id)
+        .await
+        .map_err(|e| {
+            CanaryError::Registry(format!("Failed to get initial shared version: {}", e))
+        })?;
 
     // Use dev_inspect to call get_full_info
     // get_full_info(canary_blob: &CanaryBlob): (address, address, address, String, u64, address)
@@ -869,9 +764,7 @@ pub async fn query_canary_blob(
         "get_full_info",
         vec![CallArg::Object(ObjectArg::SharedObject {
             id: canary_blob_id,
-            initial_shared_version: canary_blob_obj
-                .previous_transaction
-                .ok_or_else(|| CanaryError::CanaryBlobNotFound)?,
+            initial_shared_version: initial_shared_version,
             mutability: SharedObjectMutability::Immutable,
         })],
     )
@@ -927,6 +820,23 @@ pub async fn query_canary_blob(
 // Helper Functions
 // ============================================================================
 
+pub async fn get_initial_shared_version(
+    client: &SuiClient,
+    object_id: ObjectID,
+) -> Result<SequenceNumber, anyhow::Error> {
+    let response = client
+        .read_api()
+        .get_object_with_options(object_id, SuiObjectDataOptions::bcs_lossless())
+        .await?;
+    let registry_initial_shared_version = match response.data.unwrap().owner.unwrap() {
+        sui_types::object::Owner::Shared {
+            initial_shared_version,
+        } => initial_shared_version,
+        _ => panic!(""),
+    };
+    Ok(registry_initial_shared_version)
+}
+
 /// Extract package ID from a Move type string
 /// Example: "0x123::member_registry::Registry" -> ObjectID(0x123)
 fn extract_package_id_from_type(type_str: &str) -> Option<ObjectID> {
@@ -948,9 +858,9 @@ async fn dev_inspect_call(
     args: Vec<CallArg>,
 ) -> Result<Vec<Vec<u8>>, CanaryError> {
     use std::str::FromStr;
-    use sui_sdk::types::identifier::Identifier;
     use sui_sdk::types::programmable_transaction_builder::ProgrammableTransactionBuilder;
     use sui_sdk::types::transaction::TransactionData;
+    use sui_types::Identifier;
 
     let module_id = Identifier::from_str(module)
         .map_err(|e| CanaryError::Registry(format!("Invalid module name: {}", e)))?;
@@ -966,7 +876,8 @@ async fn dev_inspect_call(
 
     // Create a dummy transaction for dev_inspect
     // We need a sender address - use a dummy address
-    let dummy_sender = SuiAddress::from_hex_literal("0x1")?;
+    let dummy_sender = SuiAddress::from_str("0x1")
+        .map_err(|e| CanaryError::Registry(format!("Failed to create dummy sender: {}", e)))?;
     let gas_price = client
         .read_api()
         .get_reference_gas_price()
@@ -988,7 +899,7 @@ async fn dev_inspect_call(
         .dev_inspect_transaction_block(
             dummy_sender,
             transaction_data,
-            gas_price,
+            Some(move_core_types::big_int::BigInt::from(gas_price)),
             None, // gas_objects - None means use dummy
             None, // epoch - None means use current
         )
@@ -1016,7 +927,7 @@ async fn query_registry_admin(
         .await
         .map_err(|e| CanaryError::Registry(format!("Failed to get registry: {}", e)))?
         .into_object()
-        .ok_or_else(|| CanaryError::Registry("Registry not found".to_string()))?;
+        .map_err(|_| CanaryError::Registry("Registry not found".to_string()))?;
 
     let result = dev_inspect_call(
         client,
@@ -1095,9 +1006,9 @@ async fn query_is_member(
         .read_api()
         .get_object_with_options(registry_id, SuiObjectDataOptions::full_content())
         .await
-        .map_err(|e| CanaryError::Registry(format!("Failed to get registry: {}", e)))?
+        .map_err(|e| CanaryError::Registry(format!("Failed to get registry: {}", e)))??
         .into_object()
-        .ok_or_else(|| CanaryError::Registry("Registry not found".to_string()))?;
+        .map_err(|_| CanaryError::Registry("Registry not found".to_string()))?;
 
     let result = dev_inspect_call(
         client,
@@ -1144,7 +1055,7 @@ async fn query_member_info(
         .await
         .map_err(|e| CanaryError::Registry(format!("Failed to get registry: {}", e)))?
         .into_object()
-        .ok_or_else(|| CanaryError::Registry("Registry not found".to_string()))?;
+        .map_err(|_| CanaryError::Registry("Registry not found".to_string()))?;
 
     // get_member_info returns &MemberInfo, but we can't return references from view functions
     // Actually, looking at the Move code, get_member_info returns &MemberInfo
