@@ -1,9 +1,13 @@
+import { SuiClient } from '@mysten/sui/client';
 import { KeyManager } from './key';
 import { CanaryClient } from './client';
 import { getAllMembers } from './queries/member-queries';
 import { MemberRegistryTransactionBuilder } from './transactions/member-registry';
 import { inspect } from 'util';
 import dotenv from 'dotenv';
+import { fetchMvrCoreInfo } from './utils/mvr';
+import { decompileMoveFile, fetchObjectBcs, getPkgModuleBytes, storeFileInTmp } from './utils/helpers';
+import { createSuiClient } from './client/sui-client-factory';
 
 
 const env = dotenv.config();
@@ -52,12 +56,29 @@ const joinRegistry = async (canaryClient: CanaryClient) => {
     }
 };
 
-const canaryClient = new CanaryClient({
+const fetchPkg = async (suiClient: SuiClient) => {
+    const info = await fetchMvrCoreInfo('lending@scallop/core');
+    const pkgAddress = info.package_address;
+    const pkgBcs = await fetchObjectBcs(suiClient, pkgAddress);
+    const pkgModuleMap = pkgBcs?.dataType === 'package' ? pkgBcs.moduleMap : undefined;
+    const pkgModuleNames = Object.keys(pkgModuleMap ?? []);
+    const pkgModuleBytes = pkgBcs ? getPkgModuleBytes(pkgBcs, pkgModuleNames[0] ?? '') : undefined;
+    if (pkgModuleBytes) {
+        const filePath = await storeFileInTmp(`${pkgModuleNames[0]}.mv`, pkgModuleBytes);
+        console.log(`File saved to: ${filePath}`);
+        const decompiledFilePath = await decompileMoveFile(filePath, `./${pkgModuleNames[0]}.move`);
+        console.log(`Decompiled file saved to: ${decompiledFilePath}`);
+    }
+};
+
+const canaryTestnetClient = new CanaryClient({
     network: process.env.SUI_NETWORK ?? 'testnet',
     packageId: process.env.CANARY_PACKAGE_ID ?? '',
     registryId: process.env.CANARY_REGISTRY_ID ?? '',
 });
+const suiMainnetClient = createSuiClient('mainnet');
 
-canaryClient.setSigner(keypair);
+canaryTestnetClient.setSigner(keypair);
 
-fetchMembers(canaryClient);
+// fetchMembers(canaryClient);
+fetchPkg(suiMainnetClient);

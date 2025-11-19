@@ -84,6 +84,7 @@ const address = await deriveCanaryAddress(
   packageId,
   registryId,
   'example.com',
+  'core',
   canaryPackageId
 );
 console.log(`Canary address: ${address}`);
@@ -99,6 +100,7 @@ const exists = await canaryExists(
   packageId,
   registryId,
   'example.com',
+  'core',
   canaryPackageId
 );
 console.log(`Canary exists: ${exists}`);
@@ -150,8 +152,8 @@ console.log('Full info:', fullInfo);
 
 ### Canary Queries
 
-- `deriveCanaryAddress(client, packageId, registryId, domain, canaryPackageId): Promise<string>`
-- `canaryExists(client, packageId, registryId, domain, canaryPackageId): Promise<boolean>`
+- `deriveCanaryAddress(client, packageId, registryId, domain, moduleName, canaryPackageId): Promise<string>`
+- `canaryExists(client, packageId, registryId, domain, moduleName, canaryPackageId): Promise<boolean>`
 - `getCanaryBlob(client, canaryBlobId): Promise<CanaryBlob | null>`
 - `getBlobIds(client, packageId, canaryBlobId): Promise<{ contractBlobId: string, explainBlobId: string }>`
 - `getFullInfo(client, packageId, canaryBlobId): Promise<CanaryBlobFullInfo>`

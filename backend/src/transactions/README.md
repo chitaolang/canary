@@ -82,9 +82,10 @@ await builder.storeBlob(
   registryId,
   adminCapId,
   'example.com',
+  'core',
   contractBlobId,
   explainBlobId,
-  packageId
+  canaryPackageId
 );
 builder.setGasBudget(10000000);
 ```
@@ -145,7 +146,7 @@ Builder for canary blob operations.
 
 #### Methods
 
-- `storeBlob(registryId, adminCapId, domain, contractBlobId, explainBlobId, packageId, clockId?): Promise<this>` - Store canary blob
+- `storeBlob(registryId, adminCapId, domain, moduleName, contractBlobId, explainBlobId, canaryPackageId, clockId?): Promise<this>` - Store canary blob
 - `updateBlob(registryId, adminCapId, canaryBlobId, newContractBlobId, newExplainBlobId, clockId?): Promise<this>` - Update canary blob
 - `deleteCanaryBlob(registryId, adminCapId, canaryBlobId): this` - Delete canary blob
 

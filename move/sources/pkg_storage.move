@@ -27,6 +27,7 @@ public struct CanaryBlob has key {
 public struct CanaryKey has copy, drop, store {
     prefix: vector<u8>, // "canary"
     domain: String,
+    module_name: String,
     package_id: address,
 }
 
@@ -34,6 +35,7 @@ public entry fun store_blob(
     registry: &mut Registry,
     admin_cap: &AdminCap,
     domain: String,
+    module_name: String,
     contract_blob_id: address,
     explain_blob_id: address,
     package_id: address,
@@ -47,6 +49,7 @@ public entry fun store_blob(
     let key = CanaryKey {
         prefix: b"canary",
         domain,
+        module_name,
         package_id,
     };
     // Create derivation key
@@ -148,10 +151,16 @@ public fun get_full_info(
 }
 
 // === Check if Derived Object exists (Requires domain + package_id) ===
-public fun canary_exists(registry: &Registry, domain: String, package_id: address): bool {
+public fun canary_exists(
+    registry: &Registry,
+    domain: String,
+    module_name: String,
+    package_id: address,
+): bool {
     let key = CanaryKey {
         prefix: b"canary",
         domain,
+        module_name,
         package_id,
     };
     derived_object::exists(member_registry::registry_uid(registry), key)
@@ -161,11 +170,13 @@ public fun canary_exists(registry: &Registry, domain: String, package_id: addres
 public fun derive_canary_address(
     registry: &Registry,
     domain: String,
+    module_name: String,
     package_id: address,
 ): address {
     let key = CanaryKey {
         prefix: b"canary",
         domain,
+        module_name,
         package_id,
     };
     derived_object::derive_address(

@@ -29,11 +29,16 @@
   },
   "dependencies": {
     "@mysten/sui": "^1.0.0",
+    "axios": "^1.13.2",
+    "base-64": "^1.0.0",
     "bech32": "^2.0.0",
-    "dotenv": "^17.2.3"
+    "dotenv": "^17.2.3",
+    "utf8": "^3.0.0"
   },
   "devDependencies": {
+    "@types/base-64": "^1",
     "@types/node": "^20.0.0",
+    "@types/utf8": "^3",
     "typescript": "^5.0.0"
   },
   "packageManager": "yarn@4.10.3"

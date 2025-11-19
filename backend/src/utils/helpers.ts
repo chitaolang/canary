@@ -4,8 +4,16 @@
  * This module provides utility functions for common operations.
  */
 
-import { SuiClient } from '@mysten/sui/client';
+import { RawData, SuiClient } from '@mysten/sui/client';
 import { Transaction } from '@mysten/sui/transactions';
+import base64 from 'base-64';
+import { exec } from 'child_process';
+import { writeFile } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join, resolve, dirname } from 'path';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 /**
  * Converts SUI amount to MIST (smallest unit)
@@ -84,12 +92,14 @@ export async function getClockObject(client: SuiClient): Promise<string> {
  * 
  * @param registryId - Registry object ID
  * @param domain - Domain string
+ * @param moduleName - Module name
  * @param packageId - Package ID
  * @returns Derived address (for reference, actual derivation happens on-chain)
  */
 export function deriveCanaryAddress(
   registryId: string,
   domain: string,
+  moduleName: string,
   packageId: string
 ): string {
   // This is a placeholder - actual derivation requires the contract's
@@ -133,4 +143,103 @@ export async function getSuiCoins(client: SuiClient, owner: string): Promise<str
   }
 
   return data.map(coin => coin.coinObjectId);
+}
+
+export async function fetchObjectBcs(client: SuiClient, id: string) {
+  const object = await client.getObject({ id: id, options: { showBcs: true } });
+  return object.data?.bcs;
+}
+
+export function getPkgModuleNames(pkgBcs: RawData) {
+  const pkgModuleMap = pkgBcs?.dataType === 'package' ? pkgBcs.moduleMap : undefined;
+  return Object.keys(pkgModuleMap ?? []);
+}
+
+export function getPkgModuleBytes(pkgBcs: RawData, moduleName: string) {
+  const pkgModuleMap = pkgBcs?.dataType === 'package' ? pkgBcs.moduleMap : undefined;
+  const base64Bytes = pkgModuleMap?.[moduleName];
+  const moduleBytes = base64Bytes ? Uint8Array.from(Buffer.from(base64Bytes, "base64")) : undefined;
+
+  return moduleBytes;
+}
+
+/**
+ * Saves given data to a temporary file and returns the full path.
+ * @param filename Name of the file to create in the tmp directory.
+ * @param data File data as string or Buffer.
+ * @returns Path to the temp file.
+ */
+export async function storeFileInTmp(filename: string, data: Uint8Array): Promise<string> {
+  const dir = tmpdir();
+  const filePath = join(dir, filename);
+  await writeFile(filePath, data);
+  return filePath;
+}
+
+/**
+ * Executes the move-decompiler script with the given filename and saves the output.
+ * 
+ * @param filename - The filename to pass to move-decompiler (e.g., 'module.mv')
+ * @param outputPath - The path where the output should be saved
+ * @param options - Optional configuration
+ * @param options.decompilerPath - Custom path to the move-decompiler script (defaults to ./backend/move-decompiler)
+ * @param options.workingDir - Working directory for the command (defaults to backend directory)
+ * @returns Promise resolving to the output path
+ * 
+ * @example
+ * ```typescript
+ * const outputPath = await decompileMoveFile('module.mv', '/tmp/decompiled.move');
+ * ```
+ */
+export async function decompileMoveFile(
+  filename: string,
+  outputPath: string,
+  options?: {
+    decompilerPath?: string;
+    workingDir?: string;
+  }
+): Promise<string> {
+  // Resolve the decompiler path - default to backend/move-decompiler
+  // __dirname will be dist/utils when compiled, so ../../ gets us to backend/
+  const defaultDecompilerPath = resolve(__dirname, '../../move-decompiler');
+  const decompilerPath = options?.decompilerPath || defaultDecompilerPath;
+
+  // Default working directory to backend directory
+  // This is where move-decompiler expects to run from
+  const defaultWorkingDir = resolve(__dirname, '../..');
+  const workingDir = options?.workingDir || defaultWorkingDir;
+
+  // Ensure output directory exists
+  const outputDir = dirname(outputPath);
+  if (outputDir !== '.' && outputDir !== '/') {
+    const { mkdir } = await import('fs/promises');
+    await mkdir(outputDir, { recursive: true });
+  }
+
+  // Build the command: move-decompiler -- -b {filename}
+  const command = `"${decompilerPath}" -b "${filename}"`;
+
+  try {
+    // Execute the command and capture stdout
+    const { stdout, stderr } = await execAsync(command, {
+      cwd: workingDir,
+      maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large outputs
+    });
+
+    // Write the output to the specified path
+    await writeFile(outputPath, stdout, 'utf-8');
+
+    // If there's stderr, log it but don't fail (some tools output warnings to stderr)
+    if (stderr) {
+      console.warn('move-decompiler stderr:', stderr);
+    }
+
+    return outputPath;
+  } catch (error: any) {
+    throw new Error(
+      `Failed to decompile Move file: ${error.message}\n` +
+      `Command: ${command}\n` +
+      `Working directory: ${workingDir}`
+    );
+  }
 }

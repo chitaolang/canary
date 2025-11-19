@@ -20,9 +20,10 @@ export class PackageStorageTransactionBuilder extends TransactionBlockBuilder {
    * @param registryId - Registry object ID
    * @param adminCapId - Admin capability object ID
    * @param domain - Domain name
+   * @param moduleName - Module name
    * @param contractBlobId - Contract blob object ID (address)
    * @param explainBlobId - Explanation blob object ID (address)
-   * @param packageId - Package ID for the canary
+   * @param canaryPackageId - Package ID for the canary
    * @param clockId - Clock object ID (optional, will be fetched if not provided)
    * @returns This builder instance for method chaining
    * 
@@ -33,9 +34,10 @@ export class PackageStorageTransactionBuilder extends TransactionBlockBuilder {
    *   registryId,
    *   adminCapId,
    *   'example.com',
+   *   'core',
    *   contractBlobId,
    *   explainBlobId,
-   *   packageId
+   *   canaryPackageId
    * );
    * ```
    */
@@ -43,6 +45,7 @@ export class PackageStorageTransactionBuilder extends TransactionBlockBuilder {
     registryId: string,
     adminCapId: string,
     domain: string,
+    moduleName: string,
     contractBlobId: string,
     explainBlobId: string,
     packageId: string,
@@ -59,6 +62,7 @@ export class PackageStorageTransactionBuilder extends TransactionBlockBuilder {
         this.tx.object(registryId), // registry: &mut Registry
         this.tx.object(adminCapId), // admin_cap: &AdminCap
         this.tx.pure.string(domain), // domain: String
+        this.tx.pure.string(moduleName), // module_name: String
         this.tx.pure.address(contractBlobId), // contract_blob_id: address
         this.tx.pure.address(explainBlobId), // explain_blob_id: address
         this.tx.pure.address(packageId), // package_id: address

@@ -11,18 +11,19 @@ import type { CanaryBlob, CanaryBlobFullInfo } from '../types/contract-types';
 import { MODULES } from '../utils/constants';
 
 /**
- * Derives the canary address from registry, domain, and package ID
+ * Derives the canary address from registry, domain, module name, and package ID
  * 
  * @param client - Sui client instance
  * @param packageId - Package ID of the deployed contract
  * @param registryId - Registry object ID
  * @param domain - Domain name
+ * @param moduleName - Module name
  * @param canaryPackageId - Package ID for the canary
  * @returns Derived canary address
  * 
  * @example
  * ```typescript
- * const address = await deriveCanaryAddress(client, packageId, registryId, 'example.com', '0x...');
+ * const address = await deriveCanaryAddress(client, packageId, registryId, 'example.com', 'core', '0x...');
  * ```
  */
 export async function deriveCanaryAddress(
@@ -30,6 +31,8 @@ export async function deriveCanaryAddress(
   packageId: string,
   registryId: string,
   domain: string,
+  moduleName: string,
+  canaryPackageId: string,
 ): Promise<string> {
   try {
     const tx = new Transaction();
@@ -40,7 +43,8 @@ export async function deriveCanaryAddress(
       arguments: [
         tx.object(registryId),
         tx.pure.string(domain),
-        tx.pure.address(packageId),
+        tx.pure.string(moduleName),
+        tx.pure.address(canaryPackageId),
       ],
     });
 
@@ -65,18 +69,19 @@ export async function deriveCanaryAddress(
 }
 
 /**
- * Checks if a canary blob exists for the given domain and package ID
+ * Checks if a canary blob exists for the given domain, module name, and package ID
  * 
  * @param client - Sui client instance
  * @param packageId - Package ID of the deployed contract
  * @param registryId - Registry object ID
  * @param domain - Domain name
+ * @param moduleName - Module name
  * @param canaryPackageId - Package ID for the canary
  * @returns true if canary exists, false otherwise
  * 
  * @example
  * ```typescript
- * const exists = await canaryExists(client, packageId, registryId, 'example.com', '0x...');
+ * const exists = await canaryExists(client, packageId, registryId, 'example.com', 'core', '0x...');
  * ```
  */
 export async function canaryExists(
@@ -84,6 +89,7 @@ export async function canaryExists(
   packageId: string,
   registryId: string,
   domain: string,
+  moduleName: string,
   canaryPackageId: string
 ): Promise<boolean> {
   try {
@@ -95,6 +101,7 @@ export async function canaryExists(
       arguments: [
         tx.object(registryId),
         tx.pure.string(domain),
+        tx.pure.string(moduleName),
         tx.pure.address(canaryPackageId),
       ],
     });

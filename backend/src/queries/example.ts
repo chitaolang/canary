@@ -149,6 +149,8 @@ export async function exampleDeriveCanaryAddress() {
   const packageId = '0xa58168ec04f9fb72a4bdfab1eabec92f46d36d0b1ac345f8db3a761a9b5c9b23';
   const registryId = '0x99cceb3ac10fc313b95968b8773a3938ca1c63c1a6a6d7367147a9730de9d6df';
   const domain = 'lending@scallop/core';
+  const moduleName = 'core';
+  const canaryPackageId = '0x...'; // Replace with actual canary package ID
 
   const client = new CanaryClient({
     network: 'testnet',
@@ -164,8 +166,10 @@ export async function exampleDeriveCanaryAddress() {
     packageId,
     registryId,
     domain,
+    moduleName,
+    canaryPackageId,
   );
-  console.log(`Canary address for ${domain}: ${address}`);
+  console.log(`Canary address for ${domain} (${moduleName}): ${address}`);
 
   return address;
 }
@@ -177,6 +181,7 @@ export async function exampleCanaryExists() {
   const packageId = '0x...';
   const registryId = '0x...';
   const domain = 'example.com';
+  const moduleName = 'core';
   const canaryPackageId = '0x...';
 
   const client = new CanaryClient({
@@ -190,6 +195,7 @@ export async function exampleCanaryExists() {
     packageId,
     registryId,
     domain,
+    moduleName,
     canaryPackageId
   );
   console.log(`Canary exists: ${exists}`);

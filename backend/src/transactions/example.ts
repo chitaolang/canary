@@ -129,6 +129,8 @@ export async function exampleStoreBlob() {
     const packageId = '0x...';
     const registryId = '0x...';
     const adminCapId = '0x...';
+    const domain = 'example.com';
+    const moduleName = 'core';
     const contractBlobId = '0x...'; // Address of contract blob
     const explainBlobId = '0x...'; // Address of explanation blob
     const canaryPackageId = '0x...'; // Package ID for the canary
@@ -144,7 +146,8 @@ export async function exampleStoreBlob() {
     const builderWithStore = await builder.storeBlob(
         registryId,
         adminCapId,
-        'example.com',
+        domain,
+        moduleName,
         contractBlobId,
         explainBlobId,
         canaryPackageId
