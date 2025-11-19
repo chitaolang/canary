@@ -58,3 +58,5 @@ export const ERROR_MESSAGES: Record<number, string> = {
   // depending on the context. The contract will return the appropriate error.
 };
 
+
+const JOHN_DOE_ADDRESS = '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
