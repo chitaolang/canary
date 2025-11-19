@@ -5,6 +5,7 @@
  */
 
 import { SuiClient } from '@mysten/sui/client';
+import { Transaction } from '@mysten/sui/transactions';
 
 /**
  * Converts SUI amount to MIST (smallest unit)
@@ -99,3 +100,37 @@ export function deriveCanaryAddress(
   );
 }
 
+
+export function getSplitSui(tx: Transaction, amount: string) {
+  /*
+  const coin = coins.pop()!;
+  if (coins.length > 0) {
+    tx.mergeCoins(
+      tx.object(coin),
+      coins.map((id) => tx.object(id))
+    );
+  }
+  */
+  const [splitCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(parseSUI(amount))]);
+
+  return splitCoin;
+}
+
+export async function getSuiCoins(client: SuiClient, owner: string): Promise<string[]> {
+  const firstPageCoins = await client.getCoins({
+    owner: owner,
+    coinType: '0x2::sui::SUI',
+  });
+
+  let hasNextPage = firstPageCoins.hasNextPage;
+  let data = firstPageCoins.data;
+  let nextCursor = firstPageCoins.nextCursor;
+  while (hasNextPage) {
+    const result = await client.getCoins({ owner: owner, coinType: '0x2::sui::SUI', cursor: nextCursor });
+    data = [...data, ...result.data];
+    hasNextPage = result.hasNextPage;
+    nextCursor = result.nextCursor;
+  }
+
+  return data.map(coin => coin.coinObjectId);
+}

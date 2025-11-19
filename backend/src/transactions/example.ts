@@ -32,7 +32,7 @@ export async function exampleJoinRegistry() {
     const builder = new MemberRegistryTransactionBuilder(client.client, packageId);
 
     // Build join registry transaction
-    const builderWithJoin = await builder.joinRegistry(registryId, 'example.com', paymentCoinId);
+    const builderWithJoin = await builder.joinRegistry(registryId, 'example.com', '1');
     builderWithJoin.setGasBudget(10000000); // 0.01 SUI
 
     // Build and sign transaction

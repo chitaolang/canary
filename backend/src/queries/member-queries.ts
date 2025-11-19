@@ -8,7 +8,7 @@ import type { SuiClient } from '@mysten/sui/client';
 import { Transaction } from '@mysten/sui/transactions';
 import { bcs } from '@mysten/sui/bcs';
 import type { MemberInfo, MemberInfoWithAddress, RegistryInfo } from '../types/contract-types';
-import { MODULES, MEMBER_REGISTRY_FUNCTIONS } from '../utils/constants';
+import { MODULES, MEMBER_REGISTRY_FUNCTIONS, JOHN_DOE_ADDRESS } from '../utils/constants';
 
 /**
  * Checks if an address is a member of the registry
@@ -149,17 +149,45 @@ export async function getAllMembers(
         });
 
         const result = await client.devInspectTransactionBlock({
-            sender: '0x0', // Use zero address for view functions
-            transactionBlock: await tx.build({ client }),
+            sender: JOHN_DOE_ADDRESS, // Use zero address for view functions
+            transactionBlock: tx,
         });
 
         if (result.results && result.results[0]?.returnValues) {
             const returnValue = result.results[0].returnValues[0];
             if (returnValue) {
                 // Decode vector<MemberInfoWithAddress> from BCS
-                // This requires proper BCS decoding of the vector and struct
-                // For now, return empty array - full implementation would decode BCS
-                return [];
+                // 
+                // The Move struct MemberInfoWithAddress has:
+                // - member: address (32 bytes)
+                // - domain: String (variable length, UTF-8 encoded)
+                // - joined_at: u64 (8 bytes, big-endian)
+                //
+                // BCS encoding for vector:
+                // 1. Length (ULEB128 encoded)
+                // 2. Each element serialized according to its type
+                const MemberInfoWithAddressStruct = bcs.struct('MemberInfoWithAddress', {
+                    member: bcs.Address,      // address (32 bytes)
+                    domain: bcs.String,        // String (length-prefixed UTF-8)
+                    joined_at: bcs.U64,        // u64 (8 bytes, returns as string)
+                });
+
+                // Create a vector type for the struct
+                // BCS vector encoding: [length (ULEB128)] [element1] [element2] ...
+                const MemberInfoWithAddressVector = bcs.vector(MemberInfoWithAddressStruct);
+
+                // Parse the return value from BCS bytes
+                // returnValue[0] is the BCS-encoded bytes as Uint8Array
+                const data = Uint8Array.from(returnValue[0]);
+                const decoded = MemberInfoWithAddressVector.parse(data);
+
+                // Convert to our TypeScript interface format
+                // Note: bcs.U64 returns a string, so we convert to number
+                return decoded.map((item) => ({
+                    member: item.member,
+                    domain: item.domain,
+                    joinedAt: Number(item.joined_at), // Convert u64 string to number
+                }));
             }
         }
 

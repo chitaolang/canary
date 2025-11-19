@@ -6,7 +6,7 @@
 
 import { TransactionBlockBuilder } from './transaction-builder';
 import { MODULES, MEMBER_REGISTRY_FUNCTIONS } from '../utils/constants';
-import { getClockObject } from '../utils/helpers';
+import { getClockObject, getSuiCoins, getSplitSui } from '../utils/helpers';
 
 /**
  * MemberRegistryTransactionBuilder - Builder for member registry transactions
@@ -19,7 +19,7 @@ export class MemberRegistryTransactionBuilder extends TransactionBlockBuilder {
    * 
    * @param registryId - Registry object ID
    * @param domain - Domain name for the member
-   * @param paymentCoin - Coin object ID to use for payment
+   * @param paymentAmount - Amount of SUI to use for payment
    * @param clockId - Clock object ID (optional, will be fetched if not provided)
    * @returns This builder instance for method chaining
    * 
@@ -32,11 +32,13 @@ export class MemberRegistryTransactionBuilder extends TransactionBlockBuilder {
   async joinRegistry(
     registryId: string,
     domain: string,
-    paymentCoin: string,
+    paymentAmount: string,
     clockId?: string
   ): Promise<this> {
     // Get Clock object ID if not provided
     const clock = clockId || (await getClockObject(this.client));
+
+    const paymentCoin = getSplitSui(this.tx, paymentAmount);
 
     this.tx.moveCall({
       package: this.packageId,
