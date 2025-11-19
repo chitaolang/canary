@@ -6,13 +6,12 @@ import { MemberRegistryTransactionBuilder } from './transactions/member-registry
 import { inspect } from 'util';
 import dotenv from 'dotenv';
 import { fetchMvrCoreInfo } from './utils/mvr';
-import { decompileMoveFile, fetchObjectBcs, getPkgModuleBytes, storeFileInTmp } from './utils/helpers';
+import { decompileMoveFile, fetchObjectBcs, getPkgModuleBytes, storeFileInTmp, readFileFromPath } from './utils/helpers';
 import { createSuiClient } from './client/sui-client-factory';
 import { join } from 'path';
-
+import { refactorDecompiledMoveCode } from './utils/claude-ai';
 
 const env = dotenv.config();
-console.log(env);
 const keyManager = new KeyManager();
 const keypair = keyManager.loadFromBech32(process.env.PRIVATE_KEY ?? '');
 const address = keyManager.getAddress(keypair);
@@ -69,6 +68,13 @@ const fetchPkg = async (suiClient: SuiClient) => {
         console.log(`File saved to: ${filePath}`);
         const decompiledFilePath = await decompileMoveFile(filePath, join(dir, `${pkgModuleNames[0]}.move`));
         console.log(`Decompiled file saved to: ${decompiledFilePath}`);
+
+        // Read the decompiled file content as a string
+        const decompiledContent = await readFileFromPath(decompiledFilePath);
+        const refactoredContent = await refactorDecompiledMoveCode(decompiledContent);
+        console.log(refactoredContent);
+        const { dir: refactoredDir, filePath: refactoredFilePath } = await storeFileInTmp(`${pkgModuleNames[0]}-refactored.json`, refactoredContent);
+        console.log(`Refactored file saved to: ${refactoredFilePath}`);
     }
 };
 

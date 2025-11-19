@@ -7,7 +7,7 @@
 import { RawData, SuiClient } from '@mysten/sui/client';
 import { Transaction } from '@mysten/sui/transactions';
 import { exec } from 'child_process';
-import { writeFile } from 'fs/promises';
+import { writeFile, readFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join, resolve, dirname } from 'path';
 import { promisify } from 'util';
@@ -168,11 +168,37 @@ export function getPkgModuleBytes(pkgBcs: RawData, moduleName: string) {
  * @param data File data as string or Buffer.
  * @returns Path to the temp file.
  */
-export async function storeFileInTmp(filename: string, data: Uint8Array): Promise<{ dir: string, filePath: string }> {
+export async function storeFileInTmp(filename: string, data: Uint8Array | string): Promise<{ dir: string, filePath: string }> {
   const dir = tmpdir();
   const filePath = join(dir, filename);
   await writeFile(filePath, data);
   return { dir, filePath };
+}
+
+/**
+ * Reads a file from the given file path and returns its contents as a string.
+ * 
+ * @param filePath - The path to the file to read
+ * @param encoding - The encoding to use (default: 'utf-8')
+ * @returns Promise resolving to the file contents as a string
+ * 
+ * @example
+ * ```typescript
+ * const content = await readFileFromPath('/tmp/decompiled.move');
+ * console.log(content);
+ * ```
+ */
+export async function readFileFromPath(
+  filePath: string,
+  encoding: BufferEncoding = 'utf-8'
+): Promise<string> {
+  try {
+    return await readFile(filePath, encoding);
+  } catch (error) {
+    throw new Error(
+      `Failed to read file from ${filePath}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }
 
 /**

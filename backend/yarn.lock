@@ -30,7 +30,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@anthropic-ai/sdk@npm:^0.70.0":
+"@anthropic-ai/sdk@npm:0.70.0":
   version: 0.70.0
   resolution: "@anthropic-ai/sdk@npm:0.70.0"
   dependencies:
@@ -57,7 +57,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@canary/backend-sdk@workspace:."
   dependencies:
-    "@anthropic-ai/sdk": "npm:^0.70.0"
+    "@anthropic-ai/sdk": "npm:0.70.0"
     "@mysten/sui": "npm:^1.0.0"
     "@types/base-64": "npm:^1"
     "@types/node": "npm:^20.0.0"
