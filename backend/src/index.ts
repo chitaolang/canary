@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import { fetchMvrCoreInfo } from './utils/mvr';
 import { decompileMoveFile, fetchObjectBcs, getPkgModuleBytes, storeFileInTmp } from './utils/helpers';
 import { createSuiClient } from './client/sui-client-factory';
+import { join } from 'path';
 
 
 const env = dotenv.config();
@@ -64,9 +65,9 @@ const fetchPkg = async (suiClient: SuiClient) => {
     const pkgModuleNames = Object.keys(pkgModuleMap ?? []);
     const pkgModuleBytes = pkgBcs ? getPkgModuleBytes(pkgBcs, pkgModuleNames[0] ?? '') : undefined;
     if (pkgModuleBytes) {
-        const filePath = await storeFileInTmp(`${pkgModuleNames[0]}.mv`, pkgModuleBytes);
+        const { dir, filePath } = await storeFileInTmp(`${pkgModuleNames[0]}.mv`, pkgModuleBytes);
         console.log(`File saved to: ${filePath}`);
-        const decompiledFilePath = await decompileMoveFile(filePath, `./${pkgModuleNames[0]}.move`);
+        const decompiledFilePath = await decompileMoveFile(filePath, join(dir, `${pkgModuleNames[0]}.move`));
         console.log(`Decompiled file saved to: ${decompiledFilePath}`);
     }
 };

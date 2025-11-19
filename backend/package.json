@@ -28,6 +28,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0",
     "@mysten/sui": "^1.0.0",
     "axios": "^1.13.2",
     "base-64": "^1.0.0",

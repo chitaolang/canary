@@ -6,7 +6,6 @@
 
 import { RawData, SuiClient } from '@mysten/sui/client';
 import { Transaction } from '@mysten/sui/transactions';
-import base64 from 'base-64';
 import { exec } from 'child_process';
 import { writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
@@ -169,11 +168,11 @@ export function getPkgModuleBytes(pkgBcs: RawData, moduleName: string) {
  * @param data File data as string or Buffer.
  * @returns Path to the temp file.
  */
-export async function storeFileInTmp(filename: string, data: Uint8Array): Promise<string> {
+export async function storeFileInTmp(filename: string, data: Uint8Array): Promise<{ dir: string, filePath: string }> {
   const dir = tmpdir();
   const filePath = join(dir, filename);
   await writeFile(filePath, data);
-  return filePath;
+  return { dir, filePath };
 }
 
 /**
