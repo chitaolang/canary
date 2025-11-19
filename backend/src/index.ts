@@ -4,17 +4,14 @@ import { CanaryClient } from './client';
 import { getAllMembers } from './queries/member-queries';
 import { MemberRegistryTransactionBuilder } from './transactions/member-registry';
 import { inspect } from 'util';
-import dotenv from 'dotenv';
 import { fetchMvrCoreInfo } from './utils/mvr';
 import { decompileMoveFile, fetchObjectBcs, getPkgModuleBytes, storeFileInTmp, readFileFromPath } from './utils/helpers';
 import { createSuiClient } from './client/sui-client-factory';
 import { join } from 'path';
 import { refactorDecompiledMoveCode } from './utils/claude-ai';
 
-const env = dotenv.config();
 const keyManager = new KeyManager();
 const keypair = keyManager.loadFromBech32(process.env.PRIVATE_KEY ?? '');
-const address = keyManager.getAddress(keypair);
 
 const fetchRegistryFields = async (canaryClient: CanaryClient) => {
     const registry = await canaryClient.client.getObject({
