@@ -7,4 +7,5 @@
 export * from './constants';
 export * from './helpers';
 export * from './claude-ai';
+export * from './walrus';
 

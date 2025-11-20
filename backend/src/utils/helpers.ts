@@ -144,6 +144,25 @@ export async function getSuiCoins(client: SuiClient, owner: string): Promise<str
   return data.map(coin => coin.coinObjectId);
 }
 
+export async function fetchAdminCapId(client: SuiClient, owner: string, packageId: string) {
+  const objects = await client.getOwnedObjects({
+    owner: owner,
+    filter: {
+      Package: packageId,
+    },
+    options: {
+      showContent: true,
+    },
+  });
+
+  const adminCapObject = objects.data?.find(
+    object => object.data?.content?.dataType === 'moveObject'
+      && object.data?.content?.type === `${packageId}::member_registry::AdminCap`
+  );
+
+  return adminCapObject?.data?.objectId;
+}
+
 export async function fetchObjectBcs(client: SuiClient, id: string) {
   const object = await client.getObject({ id: id, options: { showBcs: true } });
   return object.data?.bcs;
@@ -223,7 +242,7 @@ export async function decompileMoveFile(
     decompilerPath?: string;
     workingDir?: string;
   }
-): Promise<string> {
+): Promise<string | false> {
   // Resolve the decompiler path - default to backend/move-decompiler
   // __dirname will be dist/utils when compiled, so ../../ gets us to backend/
   const defaultDecompilerPath = resolve(__dirname, '../../move-decompiler');
@@ -261,10 +280,11 @@ export async function decompileMoveFile(
 
     return outputPath;
   } catch (error: any) {
-    throw new Error(
+    console.error(
       `Failed to decompile Move file: ${error.message}\n` +
       `Command: ${command}\n` +
       `Working directory: ${workingDir}`
     );
+    return false
   }
 }

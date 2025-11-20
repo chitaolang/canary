@@ -59,6 +59,7 @@ __metadata:
   dependencies:
     "@anthropic-ai/sdk": "npm:0.70.0"
     "@mysten/sui": "npm:^1.0.0"
+    "@mysten/walrus": "npm:^0.8.4"
     "@types/base-64": "npm:^1"
     "@types/node": "npm:^20.0.0"
     "@types/utf8": "npm:^3"
@@ -124,7 +125,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@mysten/sui@npm:^1.0.0":
+"@mysten/sui@npm:1.45.0, @mysten/sui@npm:^1.0.0":
   version: 1.45.0
   resolution: "@mysten/sui@npm:1.45.0"
   dependencies:
@@ -153,6 +154,26 @@ __metadata:
   dependencies:
     "@scure/base": "npm:^1.2.6"
   checksum: 10/3558f5d6263364f7aa47559e7220d4a4cbca268c24ed2d97aa5e784de5ed59f7d2cb4ab809010697ce330211265a50b1bb4893da9313223dc52aba00dff420a1
+  languageName: node
+  linkType: hard
+
+"@mysten/walrus-wasm@npm:0.1.1":
+  version: 0.1.1
+  resolution: "@mysten/walrus-wasm@npm:0.1.1"
+  checksum: 10/464ee17817a3fdb6e41714ec3d158a3a4a7bb1337e529a55292ded87c0675c39dd95bc31c72885ff5859ce8d127135b0c9bd0b471ebf2a921cdc4f96ef4123d4
+  languageName: node
+  linkType: hard
+
+"@mysten/walrus@npm:^0.8.4":
+  version: 0.8.4
+  resolution: "@mysten/walrus@npm:0.8.4"
+  dependencies:
+    "@mysten/bcs": "npm:1.9.2"
+    "@mysten/sui": "npm:1.45.0"
+    "@mysten/utils": "npm:0.2.0"
+    "@mysten/walrus-wasm": "npm:0.1.1"
+    dataloader: "npm:^2.2.3"
+  checksum: 10/90a08bb75637812b214a47d45cc95acec5a03ed520de44522660042217662817367246a6d5f703770908fdc5867e8d2b3a5358750ed73e355e49d2ba01fe84d4
   languageName: node
   linkType: hard
 
@@ -320,6 +341,13 @@ __metadata:
   dependencies:
     delayed-stream: "npm:~1.0.0"
   checksum: 10/2e969e637d05d09fa50b02d74c83a1186f6914aae89e6653b62595cc75a221464f884f55f231b8f4df7a49537fba60bdc0427acd2bf324c09a1dbb84837e36e4
+  languageName: node
+  linkType: hard
+
+"dataloader@npm:^2.2.3":
+  version: 2.2.3
+  resolution: "dataloader@npm:2.2.3"
+  checksum: 10/83fe6259abe00ae64c5f48252ef59d8e5fcabda9fd4d26685f14a76eeca596bf6f9500d9f22a0094c50c3ea782a0977728f9367e232dfa0fdb5c9d646de279b2
   languageName: node
   linkType: hard
 

@@ -38,10 +38,10 @@ export class TransactionBlockBuilder {
    * @param client - Sui client instance
    * @param packageId - Package ID of the deployed contract
    */
-  constructor(client: SuiClient, packageId: string) {
+  constructor(client: SuiClient, packageId: string, tx?: Transaction) {
     this.client = client;
     this.packageId = packageId;
-    this.tx = new Transaction();
+    this.tx = tx ?? new Transaction();
   }
 
   /**

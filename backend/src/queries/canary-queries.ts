@@ -8,7 +8,7 @@ import type { SuiClient } from '@mysten/sui/client';
 import { Transaction } from '@mysten/sui/transactions';
 import { bcs } from '@mysten/sui/bcs';
 import type { CanaryBlob, CanaryBlobFullInfo } from '../types/contract-types';
-import { MODULES } from '../utils/constants';
+import { JOHN_DOE_ADDRESS, MODULES } from '../utils/constants';
 
 /**
  * Derives the canary address from registry, domain, module name, and package ID
@@ -105,6 +105,7 @@ export async function canaryExists(
         tx.pure.address(canaryPackageId),
       ],
     });
+    tx.setSender(JOHN_DOE_ADDRESS);
 
     const result = await client.devInspectTransactionBlock({
       sender: '0x0',

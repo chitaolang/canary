@@ -30,6 +30,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "0.70.0",
     "@mysten/sui": "^1.0.0",
+    "@mysten/walrus": "^0.8.4",
     "axios": "^1.13.2",
     "base-64": "^1.0.0",
     "bech32": "^2.0.0",

@@ -90,7 +90,7 @@ export async function refactorDecompiledMoveCode(
             messages: [
                 {
                     role: 'user',
-                    content: `\n\n---\n\nPlease refactor the following decompiled Move code:\n\n\`\`\`move\n${decompiledCode}\n\`\`\``,
+                    content: `\n\n---\n\nPlease refactor the following decompiled Move code and only output the refactored code:\n\n\`\`\`move\n${decompiledCode}\n\`\`\``,
                 },
             ],
             output_format: {
@@ -99,9 +99,8 @@ export async function refactorDecompiledMoveCode(
                     type: "object",
                     properties: {
                         refactored_code: { type: "string" },
-                        explanation: { type: "string" },
                     },
-                    required: ["refactored_code", "explanation"],
+                    required: ["refactored_code"],
                     additionalProperties: false
                 }
             }
@@ -167,7 +166,7 @@ export async function explainDecompiledFunctions(
 ): Promise<string> {
     const client = getAnthropicClient();
 
-    const model = options?.model || 'claude-3-5-sonnet-20241022';
+    const model = "claude-sonnet-4-5";
     const maxTokens = options?.maxTokens || 2048;
     const temperature = options?.temperature ?? 0.2;
 
@@ -193,9 +192,10 @@ ${decompiledCode}
 \`\`\``;
 
     try {
-        const message = await client.messages.create({
+        const message = await client.beta.messages.create({
             model,
             max_tokens: maxTokens,
+            betas: ["structured-outputs-2025-11-13"],
             temperature,
             messages: [
                 {
@@ -203,6 +203,17 @@ ${decompiledCode}
                     content: explanationPrompt,
                 },
             ],
+            output_format: {
+                type: "json_schema",
+                schema: {
+                    type: "object",
+                    properties: {
+                        explanation: { type: "string" },
+                    },
+                    required: ["explanation"],
+                    additionalProperties: false
+                }
+            }
         });
 
         // Extract text content from the response

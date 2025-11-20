@@ -19,6 +19,7 @@ public struct CanaryBlob has key {
     explain_blob_id: address,
     package_id: address,
     domain: String,
+    module_name: String,
     uploaded_at: u64,
     uploaded_by_admin: address,
 }
@@ -68,6 +69,7 @@ public entry fun store_blob(
         explain_blob_id,
         package_id,
         domain: key.domain,
+        module_name: key.module_name,
         uploaded_at: clock::timestamp_ms(clock),
         uploaded_by_admin: sender,
     };
@@ -109,6 +111,7 @@ public entry fun delete_canary_blob(
         explain_blob_id: _,
         package_id: _,
         domain: _,
+        module_name: _,
         uploaded_at: _,
         uploaded_by_admin: _,
     } = canary_blob;
