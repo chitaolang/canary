@@ -34,10 +34,7 @@ RUN suiup --version
 
 # install sui, walrus, and mvr via suiup
 # Note: Network will be configured at runtime via SUI_NETWORK environment variable
-RUN suiup install sui@testnet -y && \
-    suiup install sui@mainnet -y && \
-    suiup install walrus -y && \
-    suiup install mvr -y
+RUN suiup install sui@testnet -y 
 
 # verify installations (suiup manages binaries, use suiup to verify)
 RUN suiup list && \
@@ -47,9 +44,6 @@ RUN suiup list && \
 
 # set working directory
 WORKDIR /app
-
-# copy Cargo files (if exist) to leverage Docker cache
-COPY backend/Cargo.toml backend/Cargo.lock* ./
 
 # copy source code
 COPY backend/ .
@@ -68,10 +62,20 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
     findutils \
+    cron \
     && rm -rf /var/lib/apt/lists/*
 
-# install suiup in runtime stage
-RUN curl -sSfL https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | sh
+# install Node.js (LTS version)
+RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
+# enable Corepack (comes with Node.js) and use it to enable yarn
+RUN corepack enable && \
+    corepack prepare yarn@4.10.3 --activate
+
+# verify Node.js and yarn installation
+RUN node --version && npm --version && yarn --version
 
 # copy suiup and installed binaries from builder stage
 # Copy the entire .local directory to preserve all binaries and symlinks
@@ -88,18 +92,38 @@ RUN mkdir -p /usr/local/bin && \
 # copy compiled binary from builder stage
 COPY --from=builder /app/target/release/* /usr/local/bin/
 
+# create application directory and set working directory
+WORKDIR /app
+
+# copy Node.js package files
+COPY backend/package.json backend/yarn.lock backend/tsconfig.json ./
+
+# install Node.js dependencies
+RUN yarn install --frozen-lockfile
+
+# copy Node.js source code
+COPY backend/src ./src
+
+# build TypeScript code
+RUN yarn build
+
+# ensure proper permissions for workspace and files
+RUN mkdir -p /app/workspace && \
+    chmod -R 755 /app && \
+    chmod -R 777 /app/workspace
+
 # copy entrypoint script
 COPY backend/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# create application directory
-WORKDIR /app
-
 # move-decompiler will be mapped via docker-compose volume
 # working directory will be used for temporary files, also mapped via volume
 
-# set environment variable (default value, can be overridden via .env)
+# set environment variables (default values, can be overridden via .env or docker-compose.yml)
 ENV RUST_LOG=info
+ENV NODE_ENV=production
+# Note: NODE_CRON_SCHEDULE should be set via docker-compose.yml or .env file, not here
+# This allows easy customization without rebuilding the image
 
 # use entrypoint script to set network before running application
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

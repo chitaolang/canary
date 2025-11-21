@@ -191,6 +191,103 @@ fi
 echo "Sui network: ${SUI_NETWORK:-not set}"
 echo "Sui RPC URL: ${SUI_RPC_URL:-using default for network}"
 
+# Setup Node.js cron job for regular execution
+if command -v node >/dev/null 2>&1; then
+    echo "Setting up Node.js cron job..."
+    
+    # Ensure workspace directory exists and has proper permissions
+    mkdir -p /app/workspace
+    chmod -R 777 /app/workspace
+    
+    # Ensure account.json has proper permissions
+    if [ -f "/app/account.json" ]; then
+        chmod 666 /app/account.json
+    fi
+    
+    # Get cron schedule from environment variable (default: every hour)
+    CRON_SCHEDULE="${NODE_CRON_SCHEDULE:-0 * * * *}"
+    
+    # Create cron job script with environment variable preservation
+    CRON_SCRIPT="/usr/local/bin/run-nodejs.sh"
+    cat > "$CRON_SCRIPT" << EOF
+#!/bin/bash
+set -e
+# Preserve environment variables
+export PATH="/root/.local/bin:/root/.sui/bin:\${PATH}"
+export RUST_LOG="${RUST_LOG:-info}"
+export NODE_ENV="${NODE_ENV:-production}"
+export SUI_NETWORK="${SUI_NETWORK:-}"
+export SUI_RPC_URL="${SUI_RPC_URL:-}"
+export CANARY_PACKAGE_ID="${CANARY_PACKAGE_ID:-}"
+export CANARY_REGISTRY_ID="${CANARY_REGISTRY_ID:-}"
+export PRIVATE_KEY="${PRIVATE_KEY:-}"
+export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
+
+cd /app
+
+# Load additional environment variables from .env if it exists
+if [ -f "/app/.env" ]; then
+    set -a
+    source /app/.env
+    set +a
+fi
+
+# Create log file with timestamp
+LOG_FILE="/app/workspace/nodejs-\$(date +%Y%m%d).log"
+echo "[\$(date '+%Y-%m-%d %H:%M:%S')] Starting Node.js process" >> "\$LOG_FILE"
+
+# Run Node.js process
+node dist/index.js >> "\$LOG_FILE" 2>&1
+
+EXIT_CODE=\$?
+if [ \$EXIT_CODE -eq 0 ]; then
+    echo "[\$(date '+%Y-%m-%d %H:%M:%S')] Node.js process completed successfully" >> "\$LOG_FILE"
+else
+    echo "[\$(date '+%Y-%m-%d %H:%M:%S')] Node.js process failed with exit code \$EXIT_CODE" >> "\$LOG_FILE"
+fi
+EOF
+    chmod +x "$CRON_SCRIPT"
+    
+    # Install flock if not available (for preventing overlapping executions)
+    if ! command -v flock >/dev/null 2>&1; then
+        apt-get update && apt-get install -y util-linux && rm -rf /var/lib/apt/lists/* || true
+    fi
+    
+    # Add cron job (use flock to prevent overlapping executions)
+    CRON_JOB="${CRON_SCHEDULE} /usr/bin/flock -n /tmp/nodejs-cron.lock ${CRON_SCRIPT} || echo '[\$(date)] Previous Node.js job still running, skipping' >> /app/workspace/nodejs-skip.log"
+    
+    # Remove existing cron jobs for this script to avoid duplicates
+    (crontab -l 2>/dev/null | grep -v "run-nodejs.sh" || true) | crontab -
+    
+    # Add new cron job
+    (crontab -l 2>/dev/null || true; echo "$CRON_JOB") | crontab -
+    
+    echo "✓ Node.js cron job configured: ${CRON_SCHEDULE}"
+    echo "Cron job will run: node dist/index.js"
+    echo "Logs will be written to: /app/workspace/nodejs-YYYYMMDD.log"
+    
+    # Start cron daemon in foreground mode (for Docker)
+    # Note: cron needs to run in the background, but we'll start it here
+    cron
+    
+    # Give cron a moment to start
+    sleep 1
+    
+    # Verify cron is running
+    if pgrep -x cron > /dev/null || pgrep -x crond > /dev/null; then
+        echo "✓ Cron service is running"
+    else
+        echo "Warning: Cron service may not be running, attempting to start..."
+        cron || true
+    fi
+    
+    # Show current crontab
+    echo "Current crontab:"
+    crontab -l || echo "No crontab entries"
+else
+    echo "Warning: Node.js not found, skipping cron setup"
+fi
+
 # 执行主程序
 exec "$@"
 

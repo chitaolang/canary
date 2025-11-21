@@ -18,6 +18,8 @@ services:
       - ./backend/account.json:/app/account.json
     environment:
       - RUST_LOG=${RUST_LOG:-info}
-    # if needed to run periodically, use cron or application internal timer
-    # here assume application has timer logic internally
+      - NODE_CRON_SCHEDULE=${NODE_CRON_SCHEDULE:-0 * * * *}
+    # Node.js process runs periodically via cron (default: every hour)
+    # Set NODE_CRON_SCHEDULE to customize the schedule (cron format)
+    # Example: "*/30 * * * *" for every 30 minutes, "0 0 * * *" for daily at midnight
 
