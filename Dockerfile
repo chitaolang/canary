@@ -48,9 +48,6 @@ WORKDIR /app
 # copy source code
 COPY backend/ .
 
-# build Rust project
-RUN cargo build --release
-
 # runtime image
 # Use Ubuntu 24.04 which has GLIBC 2.39 (required by sui binaries)
 FROM ubuntu:24.04
@@ -89,9 +86,6 @@ ENV PATH="/root/.local/bin:/root/.sui/bin:${PATH}"
 RUN mkdir -p /usr/local/bin && \
     ln -sf /root/.local/bin/suiup /usr/local/bin/suiup || true
 
-# copy compiled binary from builder stage
-COPY --from=builder /app/target/release/* /usr/local/bin/
-
 # create application directory and set working directory
 WORKDIR /app
 
@@ -99,7 +93,7 @@ WORKDIR /app
 COPY backend/package.json backend/yarn.lock backend/tsconfig.json ./
 
 # install Node.js dependencies
-RUN yarn install --frozen-lockfile
+RUN yarn install
 
 # copy Node.js source code
 COPY backend/src ./src
