@@ -12,28 +12,29 @@
 
 import { refactorDecompiledMoveCode, explainDecompiledFunctions } from './claude-ai';
 import { readFile } from 'fs/promises';
-import { decompileMoveFile, storeFileInTmp } from './helpers';
+import { decompileMoveFile, readFileFromPath, storeFileInTmp } from './helpers';
 import { join } from 'path';
 
 /**
  * Example: Refactor decompiled Move code
  */
 export async function exampleRefactorDecompiledCode() {
+  const apiKey = '...'
   try {
     // Step 1: Read decompiled Move code (assuming you already have it)
     const decompiledCode = await readFile('/tmp/decompiled.move', 'utf-8');
-    
+
     // Step 2: Refactor using Claude AI
     console.log('Refactoring decompiled Move code with Claude AI...');
-    const refactoredCode = await refactorDecompiledMoveCode(decompiledCode);
-    
+    const refactoredCode = await refactorDecompiledMoveCode(decompiledCode, apiKey);
+
     // Step 3: Save or use the refactored code
     console.log('Refactored code:');
     console.log(refactoredCode);
-    
+
     // Optionally save to file
     // await writeFile('/tmp/refactored.move', refactoredCode, 'utf-8');
-    
+
     return refactoredCode;
   } catch (error) {
     console.error('Error refactoring code:', error);
@@ -45,21 +46,22 @@ export async function exampleRefactorDecompiledCode() {
  * Example: Explain decompiled Move functions
  */
 export async function exampleExplainDecompiledFunctions() {
+  const apiKey = '...'
   try {
     // Step 1: Read decompiled Move code
     const decompiledCode = await readFile('/tmp/decompiled.move', 'utf-8');
-    
+
     // Step 2: Get explanations from Claude AI
     console.log('Analyzing decompiled Move functions with Claude AI...');
-    const explanation = await explainDecompiledFunctions(decompiledCode);
-    
+    const explanation = await explainDecompiledFunctions(decompiledCode, apiKey);
+
     // Step 3: Display or save the explanation
     console.log('Function explanations:');
     console.log(explanation);
-    
+
     // Optionally save to file
     // await writeFile('/tmp/explanation.md', explanation, 'utf-8');
-    
+
     return explanation;
   } catch (error) {
     console.error('Error explaining functions:', error);
@@ -74,6 +76,7 @@ export async function exampleCompleteWorkflow(
   moduleBytes: Uint8Array,
   moduleName: string
 ) {
+  const apiKey = '...'
   try {
     // Step 1: Decompile Move bytecode
     console.log(`Decompiling ${moduleName}...`);
@@ -83,20 +86,22 @@ export async function exampleCompleteWorkflow(
       join(dir, `${moduleName}.move`)
     );
     console.log(`Decompiled to: ${decompiledPath}`);
-    
+    if (!decompiledPath) {
+      throw new Error('Failed to decompile Move bytecode');
+    }
     // Step 2: Read decompiled code
-    const decompiledCode = await readFile(decompiledPath, 'utf-8');
-    
+    const decompiledCode = await readFileFromPath(decompiledPath);
+
     // Step 3: Refactor the code
     console.log('Refactoring with Claude AI...');
-    const refactoredCode = await refactorDecompiledMoveCode(decompiledCode);
+    const refactoredCode = await refactorDecompiledMoveCode(decompiledCode, apiKey);
     console.log('Refactored code received');
-    
+
     // Step 4: Get function explanations
     console.log('Getting function explanations...');
-    const explanation = await explainDecompiledFunctions(decompiledCode);
+    const explanation = await explainDecompiledFunctions(decompiledCode, apiKey);
     console.log('Explanations received');
-    
+
     return {
       decompiledPath,
       decompiledCode,
@@ -109,29 +114,4 @@ export async function exampleCompleteWorkflow(
   }
 }
 
-/**
- * Example with custom options
- */
-export async function exampleWithCustomOptions(decompiledCode: string) {
-  try {
-    // Refactor with custom model and settings
-    const refactoredCode = await refactorDecompiledMoveCode(decompiledCode, {
-      model: 'claude-3-opus-20240229', // Use Opus for complex code
-      maxTokens: 8192, // Larger response
-      temperature: 0.0, // More deterministic
-    });
-    
-    // Explain with custom settings
-    const explanation = await explainDecompiledFunctions(decompiledCode, {
-      model: 'claude-3-5-sonnet-20241022',
-      maxTokens: 4096,
-      temperature: 0.3, // Slightly more creative
-    });
-    
-    return { refactoredCode, explanation };
-  } catch (error) {
-    console.error('Error with custom options:', error);
-    throw error;
-  }
-}
 

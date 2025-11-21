@@ -16,18 +16,17 @@ import { PackageStorageTransactionBuilder } from './transactions/pkg-storage';
 
 import { deriveObjectID } from '@mysten/sui/utils';
 import { bcs } from '@mysten/sui/bcs';
-import { canaryExists } from './queries/canary-queries';
 
 import { getDerivedId } from './utils/blob';
 import { Transaction } from '@mysten/sui/transactions';
 
 const env = dotenv.config();
 const keyManager = new KeyManager();
-const keypair = keyManager.loadFromBech32(process.env.PRIVATE_KEY ?? '');
+const keypair = keyManager.loadFromBech32(env.parsed?.PRIVATE_KEY ?? '');
 
 const fetchRegistryFields = async (canaryClient: CanaryClient) => {
     const registry = await canaryClient.client.getObject({
-        id: process.env.CANARY_REGISTRY_ID ?? '',
+        id: env.parsed?.CANARY_REGISTRY_ID ?? '',
         options: {
             showContent: true,
         },
@@ -48,7 +47,13 @@ const joinRegistry = async (canaryClient: CanaryClient) => {
     const builder = new MemberRegistryTransactionBuilder(canaryClient.client, canaryClient.packageId);
 
 
-    const builderWithJoin = await builder.joinRegistry(canaryClient.registryId ?? '', 'lending@scallop/core', '1');
+    console.log('Joining registry...');
+    console.log('Signer address:', canaryClient.getSignerAddress());
+    console.log('Registry ID:', canaryClient.registryId);
+    console.log('Domain:', '@suilend/core');
+    console.log('Payment amount:', '1');
+    const builderWithJoin = await builder.joinRegistry(canaryClient.registryId ?? '', '@suilend/core', '1');
+    console.log('Builder with join:', builderWithJoin);
     builderWithJoin.setGasBudget(10000000);
     builderWithJoin.setSender(canaryClient.getSignerAddress() ?? '');
 
@@ -66,6 +71,7 @@ const joinRegistry = async (canaryClient: CanaryClient) => {
 };
 
 const explainPkg = async (moduleName: string, pkgModuleBytes: Uint8Array) => {
+    const apiKey = env.parsed?.ANTHROPIC_API_KEY ?? '';
     const { dir, filePath } = await storeFileInTmp(`${moduleName}.mv`, pkgModuleBytes);
     console.log(`File saved to: ${filePath}`);
     const decompiledFilePath = await decompileMoveFile(filePath, join(dir, `${moduleName}.move`));
@@ -76,8 +82,8 @@ const explainPkg = async (moduleName: string, pkgModuleBytes: Uint8Array) => {
 
     // Read the decompiled file content as a string
     const decompiledContent = await readFileFromPath(decompiledFilePath);
-    const refactoredContent = await refactorDecompiledMoveCode(decompiledContent);
-    const explanation = await explainDecompiledFunctions(refactoredContent);
+    const refactoredContent = await refactorDecompiledMoveCode(decompiledContent, apiKey);
+    const explanation = await explainDecompiledFunctions(refactoredContent, apiKey);
 
     const { dir: refactoredDir, filePath: refactoredFilePath } = await storeFileInTmp(`${moduleName}-refactored.json`, refactoredContent);
     const { dir: explanationDir, filePath: explanationFilePath } = await storeFileInTmp(`${moduleName}-explanation.json`, explanation);
@@ -88,94 +94,6 @@ const explainPkg = async (moduleName: string, pkgModuleBytes: Uint8Array) => {
         explanationFilePath,
     };
 }
-
-const main = async () => {
-    const canaryTestnetClient = new CanaryClient({
-        network: process.env.SUI_NETWORK ?? 'testnet',
-        packageId: process.env.CANARY_PACKAGE_ID ?? '',
-        registryId: process.env.CANARY_REGISTRY_ID ?? '',
-        signer: keypair,
-    });
-    const suiMainnetClient = createSuiClient('mainnet');
-    const suiTestnetClient = createSuiClient('testnet');
-
-    const walrusClient = createWalrusClient({
-        network: 'testnet',
-        suiClient: suiTestnetClient,
-    });
-
-    const adminCapId = await fetchAdminCapId(
-        suiTestnetClient,
-        keyManager.getAddress(keypair),
-        process.env.CANARY_PACKAGE_ID ?? ''
-    );
-    if (!adminCapId) {
-        throw new Error('Admin cap ID not found');
-    }
-    // fetch members
-    const members = await getAllMembers(
-        canaryTestnetClient.client,
-        canaryTestnetClient.packageId,
-        canaryTestnetClient.registryId ?? ''
-    );
-
-    let domains = members.map((member) => member.domain);
-    // remove duplicate domains
-    domains = [...new Set(domains)];
-
-    for (const domain of domains) {
-        console.log(`Processing domain: ${domain}`);
-        if (canaryTestnetClient.registryId && canaryTestnetClient.packageId) {
-            const storageTx = new Transaction()
-            const domainInfo = await fetchMvrCoreInfo(domain);
-            const pkgAddress = domainInfo.package_address;
-            let packageInfo = await fetchPkgInfo(suiMainnetClient, suiTestnetClient, pkgAddress, canaryTestnetClient.registryId, domain);
-            console.log('Uploading files to Walrus');
-            const refactorBlobsInfo = (await uploadFilesToWalrus(walrusClient, suiTestnetClient, {
-                filePaths: packageInfo.map((pkg) => pkg.refactoredFilePath),
-                signer: keypair,
-                epochs: 1,
-                deletable: true,
-                attributes: {
-                    'upload-type': 'batch',
-                },
-            })).files;
-            const explanationBlobsInfo = (await uploadFilesToWalrus(walrusClient, suiTestnetClient, {
-                filePaths: packageInfo.map((pkg) => pkg.explanationFilePath),
-                signer: keypair,
-                epochs: 1,
-                deletable: true,
-                attributes: {
-                    'upload-type': 'batch',
-                },
-            })).files;
-            console.log('Building transaction...');
-            for (let i = 0; i < packageInfo.length; i++) {
-                const storageTxBuilder = new PackageStorageTransactionBuilder(canaryTestnetClient.client, canaryTestnetClient.packageId, storageTx);
-                await storageTxBuilder.storeBlob(
-                    canaryTestnetClient.registryId,
-                    adminCapId,
-                    domain,
-                    packageInfo[i].moduleName,
-                    refactorBlobsInfo[i].blobObjectId,
-                    explanationBlobsInfo[i].blobObjectId,
-                    canaryTestnetClient.packageId,
-                );
-            }
-            storageTx.setSender(canaryTestnetClient.getSignerAddress());
-            storageTx.setGasBudget(10000000);
-            const tx = await storageTx;
-            console.log('Sending transaction...');
-            const result = await canaryTestnetClient.client.signAndExecuteTransaction({
-                signer: canaryTestnetClient.signer!,
-                transaction: tx,
-            });
-            console.log(`${domain} storage transaction result:`, inspect(result, { depth: null }));
-        }
-    }
-    console.log('All modules checked');
-}
-
 const checkModuleExists = async (client: SuiClient, packageId: string, registryId: string, domain: string, moduleName: string) => {
     const derivedId = getDerivedId(domain, moduleName, packageId, registryId);
     const exists = await client.getObject({
@@ -210,6 +128,97 @@ const fetchPkgInfo = async (suiMainnetClient: SuiClient, suiTestnetClient: SuiCl
     }
     return packageInfo;
 }
+
+const main = async () => {
+    const canaryTestnetClient = new CanaryClient({
+        network: env.parsed?.SUI_NETWORK ?? 'testnet',
+        packageId: env.parsed?.CANARY_PACKAGE_ID ?? '',
+        registryId: env.parsed?.CANARY_REGISTRY_ID ?? '',
+        signer: keypair,
+    });
+    const suiMainnetClient = createSuiClient('mainnet');
+    const suiTestnetClient = createSuiClient('testnet');
+
+    const walrusClient = createWalrusClient({
+        network: 'testnet',
+        suiClient: suiTestnetClient,
+    });
+
+    const adminCapId = await fetchAdminCapId(
+        suiTestnetClient,
+        keyManager.getAddress(keypair),
+        env.parsed?.CANARY_PACKAGE_ID ?? ''
+    );
+    if (!adminCapId) {
+        throw new Error('Admin cap ID not found');
+    }
+    // fetch members
+    const members = await getAllMembers(
+        canaryTestnetClient.client,
+        canaryTestnetClient.packageId,
+        canaryTestnetClient.registryId ?? ''
+    );
+
+    let domains = members.map((member) => member.domain);
+    // remove duplicate domains
+    domains = [...new Set(domains)];
+
+    for (const domain of domains) {
+        if (domain !== '@suilend/core') {
+            continue;
+        }
+        console.log(`Processing domain: ${domain}`);
+        if (canaryTestnetClient.registryId && canaryTestnetClient.packageId) {
+            const storageTx = new Transaction()
+            const domainInfo = await fetchMvrCoreInfo(domain);
+            const pkgAddress = domainInfo.package_address;
+            const packageInfo = await fetchPkgInfo(suiMainnetClient, suiTestnetClient, pkgAddress, canaryTestnetClient.registryId, domain);
+            console.log('Uploading files to Walrus');
+            const refactorBlobsInfo = (await uploadFilesToWalrus(walrusClient, suiTestnetClient, {
+                filePaths: packageInfo.map((pkg) => pkg.refactoredFilePath),
+                signer: keypair,
+                epochs: 1,
+                deletable: true,
+                attributes: {
+                    'upload-type': 'batch',
+                },
+            })).files;
+            const explanationBlobsInfo = (await uploadFilesToWalrus(walrusClient, suiTestnetClient, {
+                filePaths: packageInfo.map((pkg) => pkg.explanationFilePath),
+                signer: keypair,
+                epochs: 1,
+                deletable: true,
+                attributes: {
+                    'upload-type': 'batch',
+                },
+            })).files;
+            console.log('Building transaction...');
+            for (let i = 0; i < packageInfo.length; i++) {
+                const storageTxBuilder = new PackageStorageTransactionBuilder(canaryTestnetClient.client, canaryTestnetClient.packageId, storageTx);
+                await storageTxBuilder.storeBlob(
+                    canaryTestnetClient.registryId,
+                    adminCapId,
+                    domain,
+                    packageInfo[i].moduleName,
+                    refactorBlobsInfo[i].blobObjectId,
+                    explanationBlobsInfo[i].blobObjectId,
+                    canaryTestnetClient.packageId,
+                );
+            }
+            storageTx.setSender(canaryTestnetClient.getSignerAddress());
+            storageTx.setGasBudget(10000000);
+            console.log('Sending transaction...');
+            const result = await canaryTestnetClient.client.signAndExecuteTransaction({
+                signer: canaryTestnetClient.signer!,
+                transaction: storageTx,
+            });
+            console.log(`${domain} storage transaction result:`, inspect(result, { depth: null }));
+        }
+    }
+    console.log('All modules checked');
+}
+
+
 
 const fetchPkg = async (suiMainnetClient: SuiClient, suiTestnetClient: SuiClient, canaryClient: CanaryClient) => {
     /*
@@ -307,7 +316,7 @@ const fetchPkg = async (suiMainnetClient: SuiClient, suiTestnetClient: SuiClient
          package_id: bcs.Address
      });
      const canaryKey = bcsType.serialize({
-         prefix: Array.from(Buffer.from('canary', 'utf8')), // 轉成 u8 array
+         prefix: Array.from(Buffer.from('canary', 'utf8')), 
          domain: 'lending@scallop/core',
          module_name: 'accrue_interest',
          package_id: packageId
@@ -319,6 +328,14 @@ const fetchPkg = async (suiMainnetClient: SuiClient, suiTestnetClient: SuiClient
 
 main();
 
+/*
+const canaryTestnetClient = new CanaryClient({
+    network: env.parsed?.SUI_NETWORK ?? 'testnet',
+    packageId: env.parsed?.CANARY_PACKAGE_ID ?? '',
+    registryId: env.parsed?.CANARY_REGISTRY_ID ?? '',
+    signer: keypair,
+});
+*/
 // fetchMembers(canaryClient);
-//fetchPkg(suiMainnetClient, suiTestnetClient, canaryTestnetClient);
+// fetchPkg(suiMainnetClient, suiTestnetClient, canaryTestnetClient);
 // joinRegistry(canaryTestnetClient);

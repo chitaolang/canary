@@ -16,9 +16,8 @@ let anthropic: Anthropic | null = null;
 /**
  * Get or initialize the Anthropic client
  */
-function getAnthropicClient(): Anthropic {
+function getAnthropicClient(apiKey: string): Anthropic {
     if (!anthropic) {
-        const apiKey = process.env.ANTHROPIC_API_KEY;
         if (!apiKey) {
             throw new Error(
                 'ANTHROPIC_API_KEY environment variable is not set. ' +
@@ -67,13 +66,14 @@ async function loadRefactoringPrompt(): Promise<string> {
  */
 export async function refactorDecompiledMoveCode(
     decompiledCode: string,
+    apiKey: string,
     options?: {
         model?: string;
         maxTokens?: number;
         temperature?: number;
     }
 ): Promise<string> {
-    const client = getAnthropicClient();
+    const client = getAnthropicClient(apiKey);
     const prompt = await loadRefactoringPrompt();
 
     const model = "claude-sonnet-4-5";
@@ -158,13 +158,14 @@ export async function refactorDecompiledMoveCode(
  */
 export async function explainDecompiledFunctions(
     decompiledCode: string,
+    apiKey: string,
     options?: {
         model?: string;
         maxTokens?: number;
         temperature?: number;
     }
 ): Promise<string> {
-    const client = getAnthropicClient();
+    const client = getAnthropicClient(apiKey);
 
     const model = "claude-sonnet-4-5";
     const maxTokens = options?.maxTokens || 2048;
