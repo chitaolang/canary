@@ -121,5 +121,7 @@ ENV NODE_ENV=production
 
 # use entrypoint script to set network before running application
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["/usr/local/bin/canary-worker"]
+# Keep container alive for cron to run Node.js process periodically
+# Cron will execute the Node.js process based on NODE_CRON_SCHEDULE
+CMD ["tail", "-f", "/dev/null"]
 

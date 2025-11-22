@@ -69,8 +69,6 @@ fi
 echo "Checking available tools..."
 command -v suiup >/dev/null 2>&1 && echo "✓ suiup found" || echo "✗ suiup not found"
 command -v sui >/dev/null 2>&1 && echo "✓ sui found" || echo "✗ sui not found"
-command -v walrus >/dev/null 2>&1 && echo "✓ walrus found" || echo "✗ walrus not found"
-command -v mvr >/dev/null 2>&1 && echo "✓ mvr found" || echo "✗ mvr not found"
 
 # Initialize Sui client configuration if needed (required before creating address)
 if command -v sui >/dev/null 2>&1; then

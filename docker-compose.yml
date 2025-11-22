@@ -12,6 +12,8 @@ services:
     volumes:
       # map local move-decompiler to container
       - ./backend/move-decompiler:/app/move-decompiler:ro
+      # map move-decompiler-prompt to container
+      - ./backend/move-decompile-refactor-prompt-en.md:/app/move-decompile-refactor-prompt-en.md:ro
       # map working directory (for temporary files)
       - ./backend/workspace:/app/workspace
       # map account.json to host (persist Sui address)
