@@ -94,8 +94,8 @@ const explainPkg = async (moduleName: string, pkgModuleBytes: Uint8Array) => {
         explanationFilePath,
     };
 }
-const checkModuleExists = async (client: SuiClient, canaryPackageId: string, packageId: string, registryId: string, domain: string, moduleName: string) => {
-    const derivedId = getDerivedId(domain, moduleName, canaryPackageId, packageId, registryId);
+const checkModuleExists = async (client: SuiClient, canaryPackageId: string, packageId: string, registryId: string, moduleName: string) => {
+    const derivedId = getDerivedId(moduleName, canaryPackageId, packageId, registryId);
     console.log(`Checking module: ${moduleName} with derived ID: ${derivedId}`);
     const exists = await client.getObject({
         id: derivedId,
@@ -103,14 +103,14 @@ const checkModuleExists = async (client: SuiClient, canaryPackageId: string, pac
     return exists.error ? false : true;
 }
 
-const fetchPkgInfo = async (suiMainnetClient: SuiClient, suiTestnetClient: SuiClient, packageId: string, registryId: string, domain: string) => {
+const fetchPkgInfo = async (suiMainnetClient: SuiClient, suiTestnetClient: SuiClient, packageId: string, registryId: string) => {
     const pkgBcs = await fetchObjectBcs(suiMainnetClient, packageId);
     const pkgModuleMap = pkgBcs?.dataType === 'package' ? pkgBcs.moduleMap : undefined;
     let pkgModuleNames = Object.keys(pkgModuleMap ?? []);
     const packageInfo = []
     for (const moduleName of pkgModuleNames) {
         console.log(`Checking module: ${moduleName}`);
-        const exists = await checkModuleExists(suiTestnetClient, env.parsed?.CANARY_PACKAGE_ID ?? '', packageId, registryId, domain, moduleName);
+        const exists = await checkModuleExists(suiTestnetClient, env.parsed?.CANARY_PACKAGE_ID ?? '', packageId, registryId, moduleName);
         if (!exists) {
             console.log(`Module ${moduleName} does not exist, explaining...`);
             const pkgModuleBytes = pkgBcs ? getPkgModuleBytes(pkgBcs, moduleName) : undefined;
@@ -175,7 +175,7 @@ const main = async () => {
             const storageTx = new Transaction()
             const domainInfo = await fetchMvrCoreInfo(domain);
             const pkgAddress = domainInfo.package_address;
-            const packageInfo = await fetchPkgInfo(suiMainnetClient, suiTestnetClient, pkgAddress, canaryTestnetClient.registryId, domain);
+            const packageInfo = await fetchPkgInfo(suiMainnetClient, suiTestnetClient, pkgAddress, canaryTestnetClient.registryId);
             if (packageInfo.length === 0) {
                 continue;
             }
