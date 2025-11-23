@@ -14,6 +14,7 @@ const EDerivedObjectAlreadyExists: u64 = 1;
 
 // === Package Info struct ===
 public struct PackageInfo has key {
+    id: UID,
     package_id: address,
     domain: String,
     module_names: vector<String>,
@@ -114,7 +115,7 @@ public entry fun store_blob(
         contract_blob_id,
         explain_blob_id,
         package_id,
-        domain: key.domain,
+        domain: domain,
         module_name: key.module_name,
         uploaded_at: clock::timestamp_ms(clock),
         uploaded_by_admin: sender,

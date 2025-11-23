@@ -5,7 +5,7 @@ import { getAllMembers } from './queries/member-queries';
 import { MemberRegistryTransactionBuilder } from './transactions/member-registry';
 import { inspect } from 'util';
 import { fetchMvrCoreInfo } from './utils/mvr';
-import { decompileMoveFile, fetchObjectBcs, getPkgModuleBytes, storeFileInTmp, readFileFromPath, fetchAdminCapId } from './utils/helpers';
+import { decompileMoveFile, fetchObjectBcs, getPkgModuleBytes, storeFileInTmp, readFileFromPath, fetchAdminCapId, sleep } from './utils/helpers';
 import { createSuiClient } from './client/sui-client-factory';
 import { join } from 'path';
 import { explainDecompiledFunctions, refactorDecompiledMoveCode } from './utils/claude-ai';
@@ -13,7 +13,7 @@ import { createWalrusClient, readFileFromWalrus, readFileFromWalrusAsString, upl
 import dotenv from 'dotenv';
 import { blobIdFromInt } from '@mysten/walrus';
 import { PackageStorageTransactionBuilder } from './transactions/pkg-storage';
-
+import { GAS_BUDGET } from './utils/constants';
 import { deriveObjectID } from '@mysten/sui/utils';
 import { bcs } from '@mysten/sui/bcs';
 
@@ -195,6 +195,8 @@ const main = async () => {
                 transaction: splitSuiTxs,
             });
             console.log('Split SUI transaction result:', inspect(splitSuiResult, { depth: null }));
+            await sleep(5000);
+            console.log('Waiting for 5 seconds...');
 
 
             console.log('Uploading files to Walrus');
@@ -216,7 +218,7 @@ const main = async () => {
                     'upload-type': 'batch',
                 },
             })).files;
-            console.log('Building transaction...');
+            console.log('Building module storage transaction...');
             for (let i = 0; i < packageInfo.length; i++) {
                 const storageTxBuilder = new PackageStorageTransactionBuilder(canaryTestnetClient.client, canaryTestnetClient.packageId, storageTx);
                 await storageTxBuilder.storeBlob(
@@ -228,9 +230,21 @@ const main = async () => {
                     explanationBlobsInfo[i].blobObjectId,
                     pkgAddress,
                 );
+
             }
+
+            console.log('Building package info storage transaction...');
+            const packageInfoTxBuilder = new PackageStorageTransactionBuilder(canaryTestnetClient.client, canaryTestnetClient.packageId, storageTx);
+            await packageInfoTxBuilder.storePackageInfo(
+                canaryTestnetClient.registryId,
+                adminCapId,
+                domain,
+                packageInfo.map((pkg) => pkg.moduleName),
+                pkgAddress,
+            );
+
             storageTx.setSender(canaryTestnetClient.getSignerAddress());
-            storageTx.setGasBudget(10000000);
+            storageTx.setGasBudget(GAS_BUDGET);
             console.log('Sending transaction...');
             const result = await canaryTestnetClient.client.signAndExecuteTransaction({
                 signer: canaryTestnetClient.signer!,

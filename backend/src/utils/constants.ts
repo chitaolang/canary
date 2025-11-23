@@ -27,6 +27,7 @@ export const MEMBER_REGISTRY_FUNCTIONS = {
  */
 export const PKG_STORAGE_FUNCTIONS = {
   STORE_BLOB: 'store_blob',
+  STORE_PACKAGE_INFO: 'store_package_info',
   UPDATE_BLOB: 'update_blob',
   DELETE_CANARY_BLOB: 'delete_canary_blob',
 } as const;
@@ -60,3 +61,4 @@ export const ERROR_MESSAGES: Record<number, string> = {
 
 
 export const JOHN_DOE_ADDRESS = '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+export const GAS_BUDGET = 1000000000;

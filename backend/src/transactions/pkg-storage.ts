@@ -74,6 +74,29 @@ export class PackageStorageTransactionBuilder extends TransactionBlockBuilder {
     return this;
   }
 
+  async storePackageInfo(
+    registryId: string,
+    adminCapId: string,
+    domain: string,
+    moduleNames: string[],
+    packageId: string,
+  ): Promise<this> {
+    this.tx.moveCall({
+      package: this.packageId,
+      module: MODULES.PKG_STORAGE,
+      function: PKG_STORAGE_FUNCTIONS.STORE_PACKAGE_INFO,
+      arguments: [
+        this.tx.object(registryId), // registry: &mut Registry
+        this.tx.object(adminCapId), // admin_cap: &AdminCap
+        this.tx.pure.string(domain), // domain: String
+        this.tx.pure.vector('string', moduleNames), // module_names: vector<String>
+        this.tx.pure.address(packageId), // package_id: address
+      ],
+    });
+
+    return this;
+  }
+
   /**
    * Builds a transaction to update a canary blob (admin only)
    * 

@@ -288,3 +288,18 @@ export async function decompileMoveFile(
     return false
   }
 }
+
+/**
+ * Sleeps for a specified number of milliseconds
+ * 
+ * @param ms - Number of milliseconds to sleep
+ * @returns Promise that resolves after the specified time
+ * 
+ * @example
+ * ```typescript
+ * await sleep(1000); // Sleep for 1 second
+ * ```
+ */
+export function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
