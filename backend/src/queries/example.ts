@@ -165,7 +165,6 @@ export async function exampleDeriveCanaryAddress() {
     client.client,
     packageId,
     registryId,
-    domain,
     moduleName,
     canaryPackageId,
   );
@@ -194,7 +193,6 @@ export async function exampleCanaryExists() {
     client.client,
     packageId,
     registryId,
-    domain,
     moduleName,
     canaryPackageId
   );

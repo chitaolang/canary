@@ -104,10 +104,22 @@ export async function getMemberInfo(
             if (returnValue) {
                 // Decode MemberInfo struct from BCS
                 // MemberInfo { domain: String, joined_at: u64 }
+                const MemberInfoStruct = bcs.struct('MemberInfo', {
+                    domain: bcs.String,        // String (length-prefixed UTF-8)
+                    joined_at: bcs.U64,        // u64 (8 bytes, returns as string)
+                });
+
+                // Parse the return value from BCS bytes
+                // returnValue[0] is the BCS-encoded bytes as Uint8Array
                 const data = Uint8Array.from(returnValue[0]);
-                // Parse the struct - this is a simplified version
-                // In practice, you'd need to decode the BCS struct properly
-                // For now, we'll read from object state instead
+                const decoded = MemberInfoStruct.parse(data);
+
+                // Convert to our TypeScript interface format
+                // Note: bcs.U64 returns a string, so we convert to number
+                return {
+                    domain: decoded.domain,
+                    joinedAt: Number(decoded.joined_at), // Convert u64 string to number
+                };
             }
         }
 

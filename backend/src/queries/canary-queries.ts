@@ -16,7 +16,6 @@ import { JOHN_DOE_ADDRESS, MODULES } from '../utils/constants';
  * @param client - Sui client instance
  * @param packageId - Package ID of the deployed contract
  * @param registryId - Registry object ID
- * @param domain - Domain name
  * @param moduleName - Module name
  * @param canaryPackageId - Package ID for the canary
  * @returns Derived canary address
@@ -30,7 +29,6 @@ export async function deriveCanaryAddress(
   client: SuiClient,
   packageId: string,
   registryId: string,
-  domain: string,
   moduleName: string,
   canaryPackageId: string,
 ): Promise<string> {
@@ -42,7 +40,6 @@ export async function deriveCanaryAddress(
       function: 'derive_canary_address',
       arguments: [
         tx.object(registryId),
-        tx.pure.string(domain),
         tx.pure.string(moduleName),
         tx.pure.address(canaryPackageId),
       ],
@@ -74,7 +71,6 @@ export async function deriveCanaryAddress(
  * @param client - Sui client instance
  * @param packageId - Package ID of the deployed contract
  * @param registryId - Registry object ID
- * @param domain - Domain name
  * @param moduleName - Module name
  * @param canaryPackageId - Package ID for the canary
  * @returns true if canary exists, false otherwise
@@ -88,7 +84,6 @@ export async function canaryExists(
   client: SuiClient,
   packageId: string,
   registryId: string,
-  domain: string,
   moduleName: string,
   canaryPackageId: string
 ): Promise<boolean> {
@@ -100,7 +95,6 @@ export async function canaryExists(
       function: 'canary_exists',
       arguments: [
         tx.object(registryId),
-        tx.pure.string(domain),
         tx.pure.string(moduleName),
         tx.pure.address(canaryPackageId),
       ],

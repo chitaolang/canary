@@ -94,8 +94,9 @@ const explainPkg = async (moduleName: string, pkgModuleBytes: Uint8Array) => {
         explanationFilePath,
     };
 }
-const checkModuleExists = async (client: SuiClient, packageId: string, registryId: string, domain: string, moduleName: string) => {
-    const derivedId = getDerivedId(domain, moduleName, packageId, registryId);
+const checkModuleExists = async (client: SuiClient, canaryPackageId: string, packageId: string, registryId: string, domain: string, moduleName: string) => {
+    const derivedId = getDerivedId(domain, moduleName, canaryPackageId, packageId, registryId);
+    console.log(`Checking module: ${moduleName} with derived ID: ${derivedId}`);
     const exists = await client.getObject({
         id: derivedId,
     });
@@ -109,7 +110,7 @@ const fetchPkgInfo = async (suiMainnetClient: SuiClient, suiTestnetClient: SuiCl
     const packageInfo = []
     for (const moduleName of pkgModuleNames) {
         console.log(`Checking module: ${moduleName}`);
-        const exists = await checkModuleExists(suiTestnetClient, packageId, registryId, domain, moduleName);
+        const exists = await checkModuleExists(suiTestnetClient, env.parsed?.CANARY_PACKAGE_ID ?? '', packageId, registryId, domain, moduleName);
         if (!exists) {
             console.log(`Module ${moduleName} does not exist, explaining...`);
             const pkgModuleBytes = pkgBcs ? getPkgModuleBytes(pkgBcs, moduleName) : undefined;
@@ -130,6 +131,7 @@ const fetchPkgInfo = async (suiMainnetClient: SuiClient, suiTestnetClient: SuiCl
 }
 
 const main = async () => {
+    const crankerAddress = keyManager.getAddress(keypair);
     const canaryTestnetClient = new CanaryClient({
         network: env.parsed?.SUI_NETWORK ?? 'testnet',
         packageId: env.parsed?.CANARY_PACKAGE_ID ?? '',
@@ -162,17 +164,39 @@ const main = async () => {
     let domains = members.map((member) => member.domain);
     // remove duplicate domains
     domains = [...new Set(domains)];
+    domains = ['@interest/coin-standard']
+    console.log(`Domains: ${domains}`);
+
+
 
     for (const domain of domains) {
-        if (domain !== '@suilend/core') {
-            continue;
-        }
         console.log(`Processing domain: ${domain}`);
         if (canaryTestnetClient.registryId && canaryTestnetClient.packageId) {
             const storageTx = new Transaction()
             const domainInfo = await fetchMvrCoreInfo(domain);
             const pkgAddress = domainInfo.package_address;
             const packageInfo = await fetchPkgInfo(suiMainnetClient, suiTestnetClient, pkgAddress, canaryTestnetClient.registryId, domain);
+            if (packageInfo.length === 0) {
+                continue;
+            }
+
+            // split SUI for each domain
+            const splitSuiTxs = new Transaction()
+            const amounts = Array(packageInfo.length + 1).fill(splitSuiTxs.pure.u64(100_000_00));
+            const [...coins] = splitSuiTxs.splitCoins(
+                splitSuiTxs.gas,
+                amounts
+            );
+            splitSuiTxs.transferObjects(coins, splitSuiTxs.pure.address(crankerAddress));
+            splitSuiTxs.setSender(crankerAddress);
+            splitSuiTxs.setGasBudget(1000000000);
+            const splitSuiResult = await canaryTestnetClient.client.signAndExecuteTransaction({
+                signer: canaryTestnetClient.signer!,
+                transaction: splitSuiTxs,
+            });
+            console.log('Split SUI transaction result:', inspect(splitSuiResult, { depth: null }));
+
+
             console.log('Uploading files to Walrus');
             const refactorBlobsInfo = (await uploadFilesToWalrus(walrusClient, suiTestnetClient, {
                 filePaths: packageInfo.map((pkg) => pkg.refactoredFilePath),
@@ -202,7 +226,7 @@ const main = async () => {
                     packageInfo[i].moduleName,
                     refactorBlobsInfo[i].blobObjectId,
                     explanationBlobsInfo[i].blobObjectId,
-                    canaryTestnetClient.packageId,
+                    pkgAddress,
                 );
             }
             storageTx.setSender(canaryTestnetClient.getSignerAddress());

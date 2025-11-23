@@ -12,7 +12,20 @@ const EDerivedObjectAlreadyExists: u64 = 1;
 // const ECanaryNotFound: u64 = 3;
 // const EDomainNotFound: u64 = 4;
 
-// === Derived Object struct ===
+// === Package Info struct ===
+public struct PackageInfo has key {
+    package_id: address,
+    domain: String,
+    module_names: vector<String>,
+}
+
+// === Package Info Derivation Key ===
+public struct PackageInfoKey has copy, drop, store {
+    prefix: vector<u8>, // "canary_package_info"
+    package_id: address,
+}
+
+// === Canary Blob struct ===
 public struct CanaryBlob has key {
     id: UID,
     contract_blob_id: address,
@@ -24,12 +37,46 @@ public struct CanaryBlob has key {
     uploaded_by_admin: address,
 }
 
-// === Derivation Key ===
+// === Canary Bolob Derivation Key ===
 public struct CanaryKey has copy, drop, store {
     prefix: vector<u8>, // "canary"
-    domain: String,
     module_name: String,
     package_id: address,
+}
+
+public entry fun store_package_info(
+    registry: &mut Registry,
+    admin_cap: &AdminCap,
+    domain: String,
+    module_names: vector<String>,
+    package_id: address,
+    ctx: &mut TxContext,
+) {
+    // Verify admin permission
+    member_registry::verify_admin(admin_cap, registry);
+    let sender = tx_context::sender(ctx);
+    // Create derivation key
+    let key = PackageInfoKey {
+        prefix: b"canary_package_info",
+        package_id,
+    };
+    // Get Registry UID for derivation
+    let registry_uid = member_registry::registry_uid_mut(registry);
+
+    // Check if derived object already exists
+    assert!(!derived_object::exists(registry_uid, key), EDerivedObjectAlreadyExists);
+
+    // Derive new UID from Registry UID
+    let derived_uid = derived_object::claim(registry_uid, key);
+
+    let package_info = PackageInfo {
+        id: derived_uid,
+        domain,
+        module_names,
+        package_id,
+    };
+
+    transfer::share_object(package_info);
 }
 
 public entry fun store_blob(
@@ -49,7 +96,6 @@ public entry fun store_blob(
     // Create derivation key
     let key = CanaryKey {
         prefix: b"canary",
-        domain,
         module_name,
         package_id,
     };
@@ -154,15 +200,9 @@ public fun get_full_info(
 }
 
 // === Check if Derived Object exists (Requires domain + package_id) ===
-public fun canary_exists(
-    registry: &Registry,
-    domain: String,
-    module_name: String,
-    package_id: address,
-): bool {
+public fun canary_exists(registry: &Registry, module_name: String, package_id: address): bool {
     let key = CanaryKey {
         prefix: b"canary",
-        domain,
         module_name,
         package_id,
     };
@@ -178,7 +218,6 @@ public fun derive_canary_address(
 ): address {
     let key = CanaryKey {
         prefix: b"canary",
-        domain,
         module_name,
         package_id,
     };

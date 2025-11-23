@@ -14,6 +14,7 @@ import { getClockObject } from '../utils/helpers';
  * Extends TransactionBlockBuilder with methods specific to canary blob operations.
  */
 export class PackageStorageTransactionBuilder extends TransactionBlockBuilder {
+
   /**
    * Builds a transaction to store a canary blob (admin only)
    * 
