@@ -164,7 +164,8 @@ const main = async () => {
     let domains = members.map((member) => member.domain);
     // remove duplicate domains
     domains = [...new Set(domains)];
-    domains = ['@interest/coin-standard']
+    // TODO: Remove this
+    // domains = ['@aftermath-fi/afsui-treasury']
     console.log(`Domains: ${domains}`);
 
 
@@ -172,7 +173,6 @@ const main = async () => {
     for (const domain of domains) {
         console.log(`Processing domain: ${domain}`);
         if (canaryTestnetClient.registryId && canaryTestnetClient.packageId) {
-            const storageTx = new Transaction()
             const domainInfo = await fetchMvrCoreInfo(domain);
             const pkgAddress = domainInfo.package_address;
             const packageInfo = await fetchPkgInfo(suiMainnetClient, suiTestnetClient, pkgAddress, canaryTestnetClient.registryId);
@@ -195,15 +195,16 @@ const main = async () => {
                 transaction: splitSuiTxs,
             });
             console.log('Split SUI transaction result:', inspect(splitSuiResult, { depth: null }));
-            await sleep(5000);
-            console.log('Waiting for 5 seconds...');
+
+            // console.log('Waiting for 10 seconds...');
+            // await sleep(10000);
 
 
             console.log('Uploading files to Walrus');
             const refactorBlobsInfo = (await uploadFilesToWalrus(walrusClient, suiTestnetClient, {
                 filePaths: packageInfo.map((pkg) => pkg.refactoredFilePath),
                 signer: keypair,
-                epochs: 1,
+                epochs: 10,
                 deletable: true,
                 attributes: {
                     'upload-type': 'batch',
@@ -212,14 +213,20 @@ const main = async () => {
             const explanationBlobsInfo = (await uploadFilesToWalrus(walrusClient, suiTestnetClient, {
                 filePaths: packageInfo.map((pkg) => pkg.explanationFilePath),
                 signer: keypair,
-                epochs: 1,
+                epochs: 10,
                 deletable: true,
                 attributes: {
                     'upload-type': 'batch',
                 },
             })).files;
-            console.log('Building module storage transaction...');
+
+            await canaryTestnetClient.client.getCoins({
+                owner: canaryTestnetClient.getSignerAddress(),
+                coinType: '0x2::sui::SUI',
+            });
+            const storageTx = new Transaction()
             for (let i = 0; i < packageInfo.length; i++) {
+                console.log(`Building ${packageInfo[i].moduleName} module storage transaction...`);
                 const storageTxBuilder = new PackageStorageTransactionBuilder(canaryTestnetClient.client, canaryTestnetClient.packageId, storageTx);
                 await storageTxBuilder.storeBlob(
                     canaryTestnetClient.registryId,
@@ -251,6 +258,7 @@ const main = async () => {
                 transaction: storageTx,
             });
             console.log(`${domain} storage transaction result:`, inspect(result, { depth: null }));
+
         }
     }
     console.log('All modules checked');

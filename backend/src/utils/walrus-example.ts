@@ -5,6 +5,7 @@
  * to upload and read files from Walrus.
  */
 
+import { blobIdFromInt } from '@mysten/walrus';
 import {
     createWalrusClient,
     uploadFileToWalrus,
@@ -133,7 +134,7 @@ export async function exampleReadFile(blobId: string) {
         });
 
         // Convert to string
-        const text = new TextDecoder().decode(fileData);
+        const text = new TextDecoder('utf-8').decode(fileData);
         console.log('File content:', text);
 
         return fileData;
@@ -147,6 +148,7 @@ export async function exampleReadFile(blobId: string) {
  * Example: Read a file from Walrus as a string
  */
 export async function exampleReadFileAsString(blobId: string) {
+    console.log('Blob ID:', blobId);
     // Initialize clients
     const network = 'testnet';
     const suiClient = createSuiClient(network);
@@ -157,11 +159,11 @@ export async function exampleReadFileAsString(blobId: string) {
 
     try {
         // Read the file directly as a string
-        const text = await readFileFromWalrusAsString(walrusClient, {
+        const text = await readFileFromWalrus(walrusClient, {
             blobId,
         });
 
-        console.log('File content:', text);
+        // console.log('File content:', text);
         return text;
     } catch (error) {
         console.error('Error reading file:', error);
@@ -233,5 +235,6 @@ if (require.main === module) {
     // exampleUploadFiles().catch(console.error);
     // exampleReadFile('0x...').catch(console.error);
     // exampleUploadAndRead().catch(console.error);
+    // exampleReadFileAsString(blobIdFromInt('110318639627558970255043626491848842669392788499893338410080836464775874933683'))
 }
 

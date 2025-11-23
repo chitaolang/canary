@@ -10,8 +10,11 @@ import {
     MemberRegistryTransactionBuilder,
     PackageStorageTransactionBuilder,
 } from './index';
+1
 import { CanaryClient } from '../client';
 import { parseSUI } from '../utils/helpers';
+import dotenv from 'dotenv';
+import { KeyManager } from '../key';
 
 /**
  * Example: Join registry
@@ -101,7 +104,7 @@ export function exampleUpdateFee() {
 /**
  * Example: Remove member (admin only)
  */
-export function exampleRemoveMember() {
+export async function exampleRemoveMember() {
     const packageId = '0x...';
     const registryId = '0x...';
     const adminCapId = '0x...';
@@ -118,6 +121,8 @@ export function exampleRemoveMember() {
     builder
         .removeMember(registryId, adminCapId, memberAddress)
         .setGasBudget(10000000);
+
+
 
     return builder;
 }
@@ -191,24 +196,39 @@ export async function exampleUpdateBlob() {
 /**
  * Example: Delete canary blob (admin only)
  */
-export function exampleDeleteCanaryBlob() {
-    const packageId = '0x...';
-    const registryId = '0x...';
-    const adminCapId = '0x...';
-    const canaryBlobId = '0x...';
+export async function exampleDeleteCanaryBlob() {
+    const env = dotenv.config();
+    const keyManager = new KeyManager();
+    const keypair = keyManager.loadFromBech32(env.parsed?.PRIVATE_KEY ?? '');
+
+    const packageId = '0x53d970dbf5744c4271d5a9720332ae46f487a2114a53ab68d84b8e058c5ce55f';
+    const registryId = '0xd46030edaf85f9c00c5149e5b84a5ef73ac92d4540dbbf62e396b5e96d494a3c';
+    const adminCapId = '0xc30fc4b406512117838fdcc6c382aaa2fe6e1eecc0d40a70b8223d6dc6608c95';
+    const canaryBlobId = '0xc19d91ef6e426d5ec3fd70203a8f3b78421c01ff04cf2861c6e5a036635eda5a';
 
     const client = new CanaryClient({
         network: 'testnet',
         packageId,
         registryId,
+        signer: keypair,
     });
 
     const builder = new PackageStorageTransactionBuilder(client.client, packageId);
 
     builder
         .deleteCanaryBlob(registryId, adminCapId, canaryBlobId)
+        .setSender(keypair.getPublicKey().toSuiAddress())
         .setGasBudget(10000000);
 
+    // Build and sign transaction
+    const txBytes = await builder.build();
+
+    // Execute transaction (requires signer)
+    const result = await client.client.signAndExecuteTransaction({
+        signer: client.signer!,
+        transaction: txBytes,
+    });
+    console.log('Transaction result:', result);
     return builder;
 }
 

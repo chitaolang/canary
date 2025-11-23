@@ -77,7 +77,7 @@ export async function refactorDecompiledMoveCode(
     const prompt = await loadRefactoringPrompt();
 
     const model = "claude-sonnet-4-5";
-    const maxTokens = options?.maxTokens || 4096;
+    const maxTokens = options?.maxTokens || 20000;
     const temperature = options?.temperature ?? 0.1;
 
     try {
@@ -90,7 +90,7 @@ export async function refactorDecompiledMoveCode(
             messages: [
                 {
                     role: 'user',
-                    content: `\n\n---\n\nPlease refactor the following decompiled Move code and only output the refactored code:\n\n\`\`\`move\n${decompiledCode}\n\`\`\``,
+                    content: `Please refactor the following decompiled Move code and only output the refactored code:${decompiledCode}`,
                 },
             ],
             output_format: {
@@ -168,11 +168,10 @@ export async function explainDecompiledFunctions(
     const client = getAnthropicClient(apiKey);
 
     const model = "claude-sonnet-4-5";
-    const maxTokens = options?.maxTokens || 2048;
+    const maxTokens = options?.maxTokens || 20000;
     const temperature = options?.temperature ?? 0.2;
 
     const explanationPrompt = `You are an expert in analyzing Sui Move language code. Your task is to analyze decompiled Move code and provide detailed explanations of what each function does.
-
 Please provide:
 1. **Module Overview**: A brief overview of what this module does
 2. **Struct Definitions**: Explanation of each struct and its purpose
@@ -185,12 +184,8 @@ Please provide:
    - Any important notes or considerations
 
 Format your response in a clear, structured way with proper markdown formatting.
-
 Now, analyze the following decompiled Move code:
-
-\`\`\`move
-${decompiledCode}
-\`\`\``;
+${decompiledCode}`;
 
     try {
         const message = await client.beta.messages.create({

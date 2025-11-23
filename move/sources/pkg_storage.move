@@ -200,7 +200,7 @@ public fun get_full_info(
     )
 }
 
-// === Check if Derived Object exists (Requires domain + package_id) ===
+// === Check if Derived Object exists (Requires package_id and module_name) ===
 public fun canary_exists(registry: &Registry, module_name: String, package_id: address): bool {
     let key = CanaryKey {
         prefix: b"canary",

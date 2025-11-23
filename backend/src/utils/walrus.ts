@@ -359,6 +359,8 @@ export async function readFileFromWalrus(
 
   try {
     const blobData = await client.readBlob({ blobId, signal });
+    // const [file] = await client.getFiles({ ids: [blobId] });
+    // const result = await file.json();
     return blobData;
   } catch (error) {
     throw new Error(
